@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, moment } from 'obsidian';
+import { App, Plugin, TFile, Notice, moment } from 'obsidian';
 import { TodoItem, TodoStatus } from './types';
 
 export default class SimpleTodoPlugin extends Plugin {
@@ -135,23 +135,100 @@ export default class SimpleTodoPlugin extends Plugin {
 		const content = await this.app.vault.read(activeFile);
 		const lines = content.split('\n');
 		
-		// 找到所有已完成的任务
-		const completedTodos = lines.filter(line => line.match(/^- \[x\] /));
-		if (completedTodos.length === 0) return;
-
-		// 创建归档文件
-		const archiveFileName = `archive-${moment().format('YYYY-MM')}.md`;
-		const archiveFile = this.app.vault.getAbstractFileByPath(archiveFileName) as TFile;
+		// 按月份分组任务
+		const tasksByMonth = this.groupTasksByMonth(lines);
 		
-		if (archiveFile) {
-			const archiveContent = await this.app.vault.read(archiveFile);
-			await this.app.vault.modify(archiveFile, archiveContent + '\n' + completedTodos.join('\n'));
-		} else {
-			await this.app.vault.create(archiveFileName, completedTodos.join('\n'));
+		// 检查每个月份是否可以归档
+		for (const [month, tasks] of Object.entries(tasksByMonth)) {
+			const hasUnfinishedTasks = tasks.some(task => task.match(/^- \[[ /]\] /));
+			if (hasUnfinishedTasks) {
+				// 如果存在未完成任务，显示通知并跳过该月份
+				new Notice(`${month} 还有未完成的任务，无法归档该月份的任务`);
+				continue;
+			}
+
+			// 获取该月份的已完成任务
+			const completedTasks = tasks.filter(task => task.match(/^- \[x\] /));
+			if (completedTasks.length === 0) continue;
+
+			// 确保归档目录存在
+			const archiveDirPath = 'simple-todo';
+			if (!await this.ensureArchiveDirectory(archiveDirPath)) {
+				new Notice('无法创建归档目录');
+				return;
+			}
+
+			// 创建或更新归档文件
+			const archiveFileName = `${archiveDirPath}/archive-${month}.md`;
+			await this.updateArchiveFile(archiveFileName, completedTasks, month);
+
+			// 从原文件中删除已归档的任务
+			content = this.removeArchivedTasks(content, completedTasks);
 		}
 
-		// 从原文件中删除已完成任务
-		const newContent = lines.filter(line => !line.match(/^- \[x\] /)).join('\n');
-		await this.app.vault.modify(activeFile, newContent);
+		// 更新原文件
+		await this.app.vault.modify(activeFile, content);
+	}
+
+	// 按月份分组任务
+	private groupTasksByMonth(lines: string[]): Record<string, string[]> {
+		const tasksByMonth: Record<string, string[]> = {};
+		let currentMonth: string | null = null;
+		const datePattern = /^(\d{4}-\d{2})-\d{2}/;
+
+		for (const line of lines) {
+			const dateMatch = line.match(datePattern);
+			if (dateMatch) {
+				currentMonth = dateMatch[1];
+				if (!tasksByMonth[currentMonth]) {
+					tasksByMonth[currentMonth] = [];
+				}
+			}
+			
+			if (currentMonth && line.match(/^- \[.+\] /)) {
+				tasksByMonth[currentMonth].push(line);
+			}
+		}
+
+		return tasksByMonth;
+	}
+
+	// 确保归档目录存在
+	private async ensureArchiveDirectory(dirPath: string): Promise<boolean> {
+		try {
+			const dir = this.app.vault.getAbstractFileByPath(dirPath);
+			if (!dir) {
+				await this.app.vault.createFolder(dirPath);
+			}
+			return true;
+		} catch (error) {
+			console.error('Failed to create archive directory:', error);
+			return false;
+		}
+	}
+
+	// 更新归档文件
+	private async updateArchiveFile(filePath: string, tasks: string[], month: string): Promise<void> {
+		try {
+			const archiveFile = this.app.vault.getAbstractFileByPath(filePath) as TFile;
+			const header = `# ${month} 已归档任务\n\n`;
+			
+			if (archiveFile) {
+				const archiveContent = await this.app.vault.read(archiveFile);
+				await this.app.vault.modify(archiveFile, archiveContent + '\n' + tasks.join('\n'));
+			} else {
+				await this.app.vault.create(filePath, header + tasks.join('\n'));
+			}
+		} catch (error) {
+			new Notice(`归档文件 ${filePath} 创建/更新失败`);
+			console.error('Failed to update archive file:', error);
+		}
+	}
+
+	// 从原文件中删除已归档的任务
+	private removeArchivedTasks(content: string, archivedTasks: string[]): string {
+		const lines = content.split('\n');
+		const archivedTasksSet = new Set(archivedTasks);
+		return lines.filter(line => !archivedTasksSet.has(line)).join('\n');
 	}
 }
