@@ -76,10 +76,10 @@
 2. 安装 pnpm (推荐) 或 npm
 3. 克隆项目到本地：
 ```bash
-git clone https://github.com/your-username/obsidian-simple-todo.git
+git clone https://github.com/elliotxx/obsidian-simple-todo.git
 ```
 
-### 开发设置
+### 开发工作流
 
 1. 安装依赖：
 ```bash
@@ -87,12 +87,7 @@ cd obsidian-simple-todo
 pnpm install
 ```
 
-2. 创建开发环境配置文件 `.env`：
-```
-OBSIDIAN_TEST_VAULT=path/to/your/test/vault
-```
-
-3. 创建软链接到测试 vault：
+2. 创建软链接到测试 vault：
 ```bash
 # Windows (管理员权限)
 mklink /D "path/to/vault/.obsidian/plugins/obsidian-simple-todo" "path/to/your/project"
@@ -101,41 +96,26 @@ mklink /D "path/to/vault/.obsidian/plugins/obsidian-simple-todo" "path/to/your/p
 ln -s "path/to/your/project" "path/to/vault/.obsidian/plugins/obsidian-simple-todo"
 ```
 
-### 开发工作流
-
-1. 启动开发服务器：
+3. 启动开发服务器：
 ```bash
-pnpm dev
+npm run dev
 ```
 
-2. 在 Obsidian 中：
+4. 在 Obsidian 中：
    - 打开设置 > 第三方插件
    - 关闭安全模式
    - 刷新已安装插件列表
    - 启用 "Simple Todo" 插件
 
-3. 修改代码后：
+5. 修改代码后：
    - 保存文件会自动重新构建
    - 在 Obsidian 中按 `Ctrl/Cmd + R` 重新加载
-
-### 项目结构
-
-```
-obsidian-simple-todo/
-├── src/
-│   ├── main.ts          # 插件主文件
-│   └── types.ts         # 类型定义
-├── manifest.json        # 插件清单
-├── package.json         # 项目配置
-├── tsconfig.json        # TypeScript 配置
-└── README.md           # 文档
-```
 
 ### 构建发布
 
 1. 构建生产版本：
 ```bash
-pnpm build
+npm run build
 ```
 
 2. 发布前检查清单：
