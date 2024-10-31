@@ -1,15 +1,25 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-simple-todo",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "一个极简的、基于文本的 Todo 管理器，支持任务状态切换、重新规划和归档功能",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": [],
-	"author": "",
+	"keywords": [
+		"obsidian",
+		"plugin",
+		"todo",
+		"gtd",
+		"task-management"
+	],
+	"author": "elliotxx",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/elliotxx/obsidian-simple-todo"
+	},
 	"license": "MIT",
 	"devDependencies": {
 		"@types/node": "^16.11.6",

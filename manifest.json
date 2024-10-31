@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "obsidian-simple-todo",
+	"name": "Simple Todo",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "一个极简的、基于文本的 Todo 管理器，支持任务状态切换、重新规划和归档功能",
+	"author": "elliotxx",
+	"authorUrl": "https://github.com/elliotxx",
 	"isDesktopOnly": false
 }
