@@ -29,6 +29,8 @@
 		"esbuild": "0.17.3",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"typescript": "4.7.4",
+		"diff": "^5.1.0",
+		"@types/diff": "^5.0.3"
 	}
 }

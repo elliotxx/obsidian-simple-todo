@@ -1,5 +1,6 @@
-import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition } from 'obsidian';
+import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
 import { TodoItem, TodoStatus } from './types';
+import * as Diff from 'diff';
 
 export default class SimpleTodoPlugin extends Plugin {
 	async onload() {
@@ -109,8 +110,8 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 
 		console.log('Starting to reschedule previous todos...');
-		let fileContent = await this.app.vault.read(activeFile);
-		const lines = fileContent.split('\n');
+		const originalContent = await this.app.vault.read(activeFile);
+		const lines = originalContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
 		// 找到最近的一天的日期和未完成任务
@@ -124,20 +125,33 @@ export default class SimpleTodoPlugin extends Plugin {
 
 		console.log(`Found ${unfinishedTodos.length} unfinished todos from ${previousDate}`);
 		
-		// 在光标处添加任务
-		await this.insertTodosAtCursor(editor, cursor, unfinishedTodos, today);
+		// 创建新内容的临时副本
+		const tempEditor = new DocumentFragment();
+		const tempContent = editor.getValue();
 		
-		// 从原位置删除已移动的任务
-		fileContent = this.removeTodosFromOriginal(fileContent, todoLineNumbers);
-		await this.app.vault.modify(activeFile, fileContent);
+		// 在临时内容中添加任务
+		const newContent = await this.insertTodosAtCursor(tempContent, cursor.line, unfinishedTodos, today);
 		
-		console.log('Successfully rescheduled todos to cursor position and removed from original location');
-		new Notice(`已重新规划 ${unfinishedTodos.length} 个任务`);
+		// 从临时内容中删除原任务
+		const finalContent = this.removeTodosFromOriginal(newContent, todoLineNumbers);
+
+		// 显示 diff modal
+		new DiffModal(
+			this.app,
+			originalContent,
+			finalContent,
+			async () => {
+				// 确认后更新文件内容
+				await this.app.vault.modify(activeFile, finalContent);
+				console.log('Successfully rescheduled todos');
+				new Notice(`已重新规划 ${unfinishedTodos.length} 个任务`);
+			}
+		).open();
 	}
 
 	// 在光标处插入任务
-	private async insertTodosAtCursor(editor: Editor, cursor: EditorPosition, todos: string[], today: string) {
-		const lines = editor.getValue().split('\n');
+	private async insertTodosAtCursor(content: string, cursorLine: number, todos: string[], today: string): Promise<string> {
+		const lines = content.split('\n');
 		const datePattern = new RegExp(`^${today}`);
 		
 		// 查找今天的日期行
@@ -155,26 +169,12 @@ export default class SimpleTodoPlugin extends Plugin {
 				.replace('星期六', '周六');
 			
 			const insertContent = `${today} ${weekday}\n${todos.join('\n')}\n`;
-			
-			editor.transaction({
-				changes: [{
-					from: {
-						line: cursor.line,
-						ch: 0
-					},
-					to: {
-						line: cursor.line,
-						ch: 0
-					},
-					text: insertContent
-				}]
-			});
+			lines.splice(cursorLine, 0, insertContent);
 		} else {
 			// 如果今天的日期已存在，需要合并任务
 			const todayTasks = this.getTodayTasks(lines, todayLineIndex);
 			const mergedTasks = this.mergeTasks(todayTasks, todos);
 			
-			// 找到今天任务的结束位置
 			let endIndex = todayLineIndex + 1;
 			for (let i = todayLineIndex + 1; i < lines.length; i++) {
 				const line = lines[i];
@@ -185,20 +185,10 @@ export default class SimpleTodoPlugin extends Plugin {
 			}
 			
 			// 替换今天的所有任务
-			editor.transaction({
-				changes: [{
-					from: {
-						line: todayLineIndex + 1,
-						ch: 0
-					},
-					to: {
-						line: endIndex,
-						ch: 0
-					},
-					text: mergedTasks.join('\n') + '\n'
-				}]
-			});
+			lines.splice(todayLineIndex + 1, endIndex - todayLineIndex - 1, ...mergedTasks);
 		}
+		
+		return lines.join('\n');
 	}
 
 	// 获取今天的任务
@@ -254,7 +244,7 @@ export default class SimpleTodoPlugin extends Plugin {
 					taskMap.get(parentStack[parentStack.length - 1]).indent.length : -1;
 			}
 			
-			// 使用缩进+内容作为 key，这样可以识别相同的任务
+			// 使缩进+内容作为 key，这样可以识别相同的任务
 			const taskKey = `${indent}${content}`;
 			
 			// 如果任务已经存在，跳过
@@ -549,7 +539,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			// 如果还有其他子任务，检查它们的状态
 			const allChildrenCompleted = this.areAllChildrenCompleted(lines, parentLineNum, parentIndent);
 			if (allChildrenCompleted) {
-				// 如果所有剩余子任务都已完成，更新父任务状态
+				// 如果所有剩子任务都已完成，更新父任务状态
 				lines[parentLineNum] = this.setTaskStatus(lines[parentLineNum], 'x');
 			}
 		}
@@ -775,5 +765,213 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 		
 		return allCompleted;
+	}
+}
+
+// DiffModal 类
+class DiffModal extends Modal {
+	private originalContent: string;
+	private newContent: string;
+	private onConfirm: () => void;
+
+	constructor(app: App, originalContent: string, newContent: string, onConfirm: () => void) {
+		super(app);
+		this.originalContent = originalContent;
+		this.newContent = newContent;
+		this.onConfirm = onConfirm;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.empty();
+
+		// 设置 modal 宽度
+		this.modalEl.style.width = '80vw';
+		this.modalEl.style.height = '80vh';
+
+		// 创建标题
+		contentEl.createEl('h2', { text: '确认更改' });
+
+		// 创建 diff 容器
+		const diffContainer = contentEl.createEl('div', { cls: 'diff-container' });
+		diffContainer.style.height = 'calc(80vh - 150px)';
+		diffContainer.style.overflow = 'auto';
+		diffContainer.style.padding = '10px';
+		diffContainer.style.border = '1px solid var(--background-modifier-border)';
+		diffContainer.style.borderRadius = '4px';
+		diffContainer.style.fontFamily = 'monospace';
+		diffContainer.style.whiteSpace = 'pre-wrap';
+		diffContainer.style.fontSize = '14px';
+
+		// 生成 diff
+		const diffs = Diff.diffLines(this.originalContent, this.newContent);
+		
+		// 找到所有变更块
+		const changes = this.findChangeBlocks(diffs);
+		
+		// 显示变更
+		changes.forEach((change, index) => {
+			if (index > 0) {
+				// 添加分隔线
+				const separator = diffContainer.createEl('div');
+				separator.style.height = '1px';
+				separator.style.margin = '10px 0';
+				separator.style.backgroundColor = 'var(--background-modifier-border)';
+			}
+
+			// 显示上文
+			if (change.context && change.context.length > 0) {
+				const contextBlock = diffContainer.createEl('div');
+				contextBlock.style.color = 'var(--text-muted)';
+				contextBlock.style.padding = '2px 4px';
+				contextBlock.textContent = change.context.join('\n');
+			}
+
+			// 显示折叠的行数
+			if (change.beforeContext) {
+				const collapsedIndicator = diffContainer.createEl('div');
+				collapsedIndicator.style.color = 'var(--text-faint)';
+				collapsedIndicator.style.textAlign = 'center';
+				collapsedIndicator.style.padding = '5px 0';
+				collapsedIndicator.style.backgroundColor = 'var(--background-secondary)';
+				collapsedIndicator.style.margin = '5px 0';
+				collapsedIndicator.textContent = `... ${change.beforeContext} 行未改变 ...`;
+			}
+
+			// 显示删除的内容
+			if (change.removed && change.removed.length > 0) {
+				const removedBlock = diffContainer.createEl('div');
+				removedBlock.style.backgroundColor = 'var(--background-modifier-error-hover)';
+				removedBlock.style.color = 'var(--text-error)';
+				removedBlock.style.padding = '2px 4px';
+				removedBlock.textContent = '- ' + change.removed.join('\n- ');
+			}
+
+			// 显示添加的内容
+			if (change.added && change.added.length > 0) {
+				const addedBlock = diffContainer.createEl('div');
+				addedBlock.style.backgroundColor = 'var(--background-modifier-success-hover)';
+				addedBlock.style.color = 'var(--text-success)';
+				addedBlock.style.padding = '2px 4px';
+				addedBlock.textContent = '+ ' + change.added.join('\n+ ');
+			}
+		});
+
+		// 创建按钮容器
+		const buttonContainer = contentEl.createEl('div', { cls: 'button-container' });
+			buttonContainer.style.marginTop = '20px';
+			buttonContainer.style.display = 'flex';
+			buttonContainer.style.justifyContent = 'flex-end';
+			buttonContainer.style.gap = '10px';
+			buttonContainer.style.padding = '10px';
+
+		// 创建确认按钮
+		const confirmButton = buttonContainer.createEl('button', { text: '确认' });
+		confirmButton.style.padding = '5px 15px';
+		confirmButton.onclick = () => {
+			this.onConfirm();
+			this.close();
+		};
+
+		// 创建取消按钮
+		const cancelButton = buttonContainer.createEl('button', { text: '取消' });
+		cancelButton.style.padding = '5px 15px';
+		cancelButton.onclick = () => {
+			this.close();
+		};
+	}
+
+	// 查找变更块
+	private findChangeBlocks(diffs: Diff.Change[]): Array<{
+		beforeContext?: number;
+		afterContext?: number;
+		removed?: string[];
+		added?: string[];
+		context?: string[];
+	}> {
+		const CONTEXT_LINES = 2;  // 显示变更块前后的上下文行数
+		const changes: Array<{
+			beforeContext?: number;
+			afterContext?: number;
+			removed?: string[];
+			added?: string[];
+			context?: string[];
+		}> = [];
+		
+		let currentChange: {
+			beforeContext?: number;
+			afterContext?: number;
+			removed?: string[];
+				added?: string[];
+			context?: string[];
+		} = {};
+		
+		let contextLines: string[] = [];
+		
+		diffs.forEach((part, index) => {
+			if (!part.added && !part.removed) {
+				const lines = part.value.split('\n')
+					.filter(line => line.length > 0);
+					
+				if (lines.length > CONTEXT_LINES * 2) {
+					// 保存前面的上下文
+					if (currentChange.removed || currentChange.added) {
+						currentChange.context = contextLines.slice(-CONTEXT_LINES);
+						changes.push(currentChange);
+						currentChange = {};
+						contextLines = [];
+					}
+					
+					// 记录被折叠的行数
+					if (lines.length > CONTEXT_LINES * 2) {
+						changes.push({
+							beforeContext: lines.length - (CONTEXT_LINES * 2)
+						});
+					}
+					
+					// 保存后面的上下文用于下一个变更
+					contextLines = lines.slice(-CONTEXT_LINES);
+				} else {
+					contextLines = contextLines.concat(lines);
+				}
+			} else {
+				const lines = part.value.split('\n')
+					.filter(line => line.length > 0);
+					
+				if (part.added) {
+					if (!currentChange.added) {
+						currentChange.added = [];
+					}
+					currentChange.added = currentChange.added.concat(lines);
+				}
+				if (part.removed) {
+					if (!currentChange.removed) {
+						currentChange.removed = [];
+					}
+					currentChange.removed = currentChange.removed.concat(lines);
+				}
+				
+				// 添加前面的上下文
+				if (contextLines.length > 0) {
+					currentChange.context = contextLines.slice(-CONTEXT_LINES);
+					contextLines = [];
+				}
+			}
+		});
+		
+		// 处理最后一个变更
+		if (currentChange.removed || currentChange.added) {
+			if (contextLines.length > 0) {
+				currentChange.context = contextLines.slice(-CONTEXT_LINES);
+			}
+			changes.push(currentChange);
+		}
+		
+		return changes;
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
 	}
 }
