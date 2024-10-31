@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor } from 'obsidian';
+import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition } from 'obsidian';
 import { TodoItem, TodoStatus } from './types';
 
 export default class SimpleTodoPlugin extends Plugin {
@@ -41,17 +41,15 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		console.log('Current line:', line);
 
-		const todoPattern = /^[\t ]*- \[([ x/])\] /;
+		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]\s*(.*)/;
 		const match = line.match(todoPattern);
 		
 		if (match) {
-			const currentStatus = match[1];
+			const [_, indent, currentStatus, content] = match;
 			const newStatus = this.getNextStatus(currentStatus);
 			console.log(`Toggling todo status: ${currentStatus} -> ${newStatus}`);
 			
-			const indentation = line.match(/^[\t ]*/)[0];
-			const taskContent = line.replace(todoPattern, '');
-			const newLine = `${indentation}- [${newStatus}] ${taskContent}`;
+			const newLine = `${indent}- [${newStatus}] ${content}`;
 			
 			editor.transaction({
 				changes: [{
@@ -96,6 +94,14 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	// 重新规划上一个任务日期的未完成任务
 	async reschedulePreviousTodos() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView) {
+			console.log('No active markdown view found');
+			return;
+		}
+
+		const editor = activeView.editor;
+		const cursor = editor.getCursor();
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
 			console.log('No active file found');
@@ -103,78 +109,316 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 
 		console.log('Starting to reschedule previous todos...');
-		const fileContent = await this.app.vault.read(activeFile);
+		let fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
 		// 找到最近的一天的日期和未完成任务
-		const { previousDate, unfinishedTodos } = this.findLatestUnfinishedTodos(lines, today);
+		const { previousDate, unfinishedTodos, todoLineNumbers } = this.findLatestUnfinishedTodos(lines, today);
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
 			console.log('No unfinished todos found from previous dates');
+			new Notice('没有找到未完成的任务');
 			return;
 		}
 
 		console.log(`Found ${unfinishedTodos.length} unfinished todos from ${previousDate}`);
 		
-		// 将任务添加到今天
-		const newContent = this.addTodosToToday(fileContent, unfinishedTodos, today);
-		await this.app.vault.modify(activeFile, newContent);
-		console.log('Successfully rescheduled todos to today');
+		// 在光标处添加任务
+		await this.insertTodosAtCursor(editor, cursor, unfinishedTodos, today);
+		
+		// 从原位置删除已移动的任务
+		fileContent = this.removeTodosFromOriginal(fileContent, todoLineNumbers);
+		await this.app.vault.modify(activeFile, fileContent);
+		
+		console.log('Successfully rescheduled todos to cursor position and removed from original location');
+		new Notice(`已重新规划 ${unfinishedTodos.length} 个任务`);
 	}
 
-	// 辅助方法：查找最近的未完成任务
-	private findLatestUnfinishedTodos(lines: string[], today: string): { previousDate: string | null, unfinishedTodos: string[] } {
+	// 在光标处插入任务
+	private async insertTodosAtCursor(editor: Editor, cursor: EditorPosition, todos: string[], today: string) {
+		// 获取当前行
+		const currentLine = editor.getLine(cursor.line);
+		
+		// 检查当前行是否是日期行
+		const datePattern = /^\d{4}-\d{2}-\d{2}/;
+		let insertContent = '';
+		
+		if (!datePattern.test(currentLine)) {
+			// 如果当前行不是日期行，先插入日期
+			// 将 dddd (星期几) 转换为 '周X' 格式
+			const weekday = moment(today).format('dddd')
+				.replace('星期日', '周日')
+				.replace('星期一', '周一')
+				.replace('星期二', '周二')
+				.replace('星期三', '周三')
+				.replace('星期四', '周四')
+				.replace('星期五', '周五')
+				.replace('星期六', '周六');
+			insertContent = `${today} ${weekday}\n`;
+		}
+		
+		// 添加所有任务，保持原有缩进
+		insertContent += todos.join('\n') + '\n';
+
+		// 在光标处插入内容
+		editor.transaction({
+			changes: [{
+				from: {
+					line: cursor.line,
+					ch: 0
+				},
+				to: {
+					line: cursor.line,
+					ch: 0
+				},
+				text: insertContent
+			}]
+		});
+	}
+
+	// 辅助方法：查找最近的未完成任务（包括父任务）
+	private findLatestUnfinishedTodos(lines: string[], today: string): { 
+		previousDate: string | null, 
+		unfinishedTodos: string[],
+		todoLineNumbers: number[]
+	} {
 		let currentDate: string | null = null;
 		let previousDate: string | null = null;
 		const unfinishedTodos: string[] = [];
+		const todoLineNumbers: number[] = [];
 		const datePattern = /^\d{4}-\d{2}-\d{2}/;
+		const todoPattern = /^[\t ]*- \[[ /]\] /;
 
-		for (const line of lines) {
+		// 用于存储任务的层级关系
+		interface TaskInfo {
+			line: string;
+			lineNumber: number;
+			indent: string;
+			parents: string[];
+		}
+		const taskInfos: TaskInfo[] = [];
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
 			// 检查是否是日期行
 			const dateMatch = line.match(datePattern);
 			if (dateMatch) {
 				const date = dateMatch[0];
 				if (date === today) {
-					// 如果是今天的日期，跳过
 					continue;
 				}
 				currentDate = date;
-				// 如果已经找到了未完成的任务，就不需要继续查找了
-				if (unfinishedTodos.length > 0) {
+				if (taskInfos.length > 0) {
 					break;
 				}
 			}
 
 			// 如果有当前日期，并且找到了未完成的任务
-			if (currentDate && line.match(/^- \[[ /]\] /)) {
-				if (unfinishedTodos.length === 0) {
-					// 记录第一个找到未完成任务的日期
-					previousDate = currentDate;
+			if (currentDate && todoPattern.test(line)) {
+				// 检查是否是叶子任务
+				if (this.isLeafTask(lines, i)) {
+					const currentIndent = line.match(/^[\t ]*/)?.[0] || '';
+					const parents = this.findParentTasks(lines, i, currentIndent);
+					
+					if (taskInfos.length === 0) {
+						previousDate = currentDate;
+					}
+					
+					taskInfos.push({
+						line,
+						lineNumber: i,
+						indent: currentIndent,
+						parents
+					});
 				}
-				unfinishedTodos.push(line);
 			}
 		}
 
-		return { previousDate, unfinishedTodos };
+		// 处理收集到的任务信息
+		for (const taskInfo of taskInfos) {
+			// 首先添加所有父任务（如果还没有添加过）
+			for (const parent of taskInfo.parents) {
+				if (!unfinishedTodos.includes(parent)) {
+					unfinishedTodos.push(parent);
+				}
+			}
+			// 然后添加当前任务
+			unfinishedTodos.push(taskInfo.line);
+			todoLineNumbers.push(taskInfo.lineNumber);
+		}
+
+		return { previousDate, unfinishedTodos, todoLineNumbers };
 	}
 
-	// 辅助方法：添加任务到今天
-	private addTodosToToday(content: string, todos: string[], today: string): string {
-		const lines = content.split('\n');
-		const todayPattern = new RegExp(`^${today}`);
-		const todayIndex = lines.findIndex(line => todayPattern.test(line));
-
-		if (todayIndex === -1) {
-			// 如果找不到今天的日期，在文件开头添加
-			const weekday = moment(today).format('dddd');
-			const todayHeader = `${today} ${weekday}`;
-			return todayHeader + '\n' + todos.join('\n') + '\n\n' + content;
-		} else {
-			// 在今天的日期下添加任务
-			lines.splice(todayIndex + 1, 0, ...todos);
-			return lines.join('\n');
+	// 查找父任务
+	private findParentTasks(lines: string[], currentLineNum: number, currentIndent: string): string[] {
+		const parents: string[] = [];
+		const todoPattern = /^[\t ]*- \[[ x/]\] /;
+		
+		// 从当前行向上查找所有父任务
+		for (let i = currentLineNum - 1; i >= 0; i--) {
+			const line = lines[i];
+			if (!todoPattern.test(line)) continue;
+			
+			const indent = line.match(/^[\t ]*/)?.[0] || '';
+			// 如果找到缩进更少的任务行，说明是父任务
+			if (indent.length < currentIndent.length) {
+				parents.unshift(line); // 添加到数组开头，保持层级顺序
+				currentIndent = indent; // 更新当前缩进，继续查找更上层的父任务
+			}
 		}
+		
+		return parents;
+	}
+
+	// 判断是否是叶子任务（没有子任务的任务）
+	private isLeafTask(lines: string[], lineNum: number): boolean {
+		const currentLine = lines[lineNum];
+		const currentIndent = currentLine.match(/^[\t ]*/)?.[0] || '';
+		
+		// 检查下一行
+		const nextLine = lines[lineNum + 1];
+		if (!nextLine) return true;  // 如果是最后一行，就是叶子任务
+		
+		// 获取下一行的缩进
+		const nextIndent = nextLine.match(/^[\t ]*/)?.[0] || '';
+		
+		// 如果下一行是任务且缩进更深，则当前任务不是叶子任务
+		if (nextIndent.length > currentIndent.length && nextLine.includes('- [')) {
+			return false;
+		}
+		
+		return true;
+	}
+
+	// 从原位置删除已移动的任务
+	private removeTodosFromOriginal(content: string, lineNumbers: number[]): string {
+		const lines = content.split('\n');
+		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
+		
+		// 从后往前处理每个任务
+		for (let i = lineNumbers.length - 1; i >= 0; i--) {
+			const currentLineNum = lineNumbers[i];
+			const currentLine = lines[currentLineNum];
+			const indentMatch = currentLine.match(/^([\t ]*)/);
+			const currentIndent = indentMatch ? indentMatch[1] : '';
+			
+			// 删除当前任务
+			lines.splice(currentLineNum, 1);
+			
+			// 检查并处理父任务
+			this.handleParentTasks(lines, currentLineNum, currentIndent);
+		}
+		
+		return lines.join('\n');
+	}
+
+	// 处理父任务
+	private handleParentTasks(lines: string[], currentLineNum: number, currentIndent: string) {
+		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
+		let parentLineNum = -1;
+		let parentIndent = '';
+		
+		// 从当前行向上查找父任务
+		for (let i = currentLineNum - 1; i >= 0; i--) {
+			const line = lines[i];
+			const match = line.match(todoPattern);
+			if (!match) continue;
+			
+			const [_, indent] = match;
+			if (indent.length < currentIndent.length) {
+				parentLineNum = i;
+				parentIndent = indent;
+				break;
+			}
+		}
+		
+		if (parentLineNum === -1) return;
+		
+		// 检查父任务是否还有其他子任务
+		const hasOtherChildren = this.checkForRemainingChildren(lines, parentLineNum, parentIndent);
+		
+		if (!hasOtherChildren) {
+			// 如果没有其他子任务，删除父任务
+			lines.splice(parentLineNum, 1);
+			// 递归处理上层父任务
+			this.handleParentTasks(lines, parentLineNum, parentIndent);
+		} else {
+			// 如果还有其他子任务，检查它们的状态
+			const allChildrenCompleted = this.areAllChildrenCompleted(lines, parentLineNum, parentIndent);
+			if (allChildrenCompleted) {
+				// 如果所有剩余子任务都已完成，更新父任务状态
+				lines[parentLineNum] = this.setTaskStatus(lines[parentLineNum], 'x');
+			}
+		}
+	}
+
+	// 检查是否还有其他子任务
+	private checkForRemainingChildren(lines: string[], parentLineNum: number, parentIndent: string): boolean {
+		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
+		
+		for (let i = parentLineNum + 1; i < lines.length; i++) {
+			const line = lines[i];
+			const match = line.match(todoPattern);
+			if (!match) continue;
+			
+			const [_, indent] = match;
+			// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
+			if (indent.length <= parentIndent.length) {
+				break;
+			}
+			// 找到了子任务
+			return true;
+		}
+		
+		return false;
+	}
+
+	// 检查所有子任务是否都已完成
+	private areAllChildrenCompleted(lines: string[], parentLineNum: number, parentIndent: string): boolean {
+		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
+		
+		for (let i = parentLineNum + 1; i < lines.length; i++) {
+			const line = lines[i];
+			const match = line.match(todoPattern);
+			if (!match) continue;
+			
+			const [_, indent, status] = match;
+			// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
+			if (indent.length <= parentIndent.length) {
+				break;
+			}
+			// 如果找到未完成的子任务，返回 false
+			if (status !== 'x') {
+				return false;
+			}
+		}
+		
+		return true;
+	}
+
+	// 设置任务状态
+	private setTaskStatus(line: string, status: string): string {
+		return line.replace(/\[([ x/])\]/, `[${status}]`);
+	}
+
+	// 判断是否应该删除任务
+	private shouldDeleteTask(lines: string[], lineNum: number, currentIndent: string): boolean {
+		// 检查下一行是否存在且是任务
+		const nextLine = lines[lineNum + 1];
+		if (!nextLine) return true;  // 如果是最后一行，可以删除
+		
+		// 获取下一行的缩进
+		const nextIndent = nextLine.match(/^[\t ]*/)?.[0] || '';
+		
+		// 如果下一行的缩进更深，说明当前任务有子任务，不应该删除
+		if (nextIndent.length > currentIndent.length && nextLine.includes('- [')) {
+			return false;
+		}
+		
+		// 如果下一行缩进相同或更浅，可以删除当前任务
+		return true;
 	}
 
 	// 归档已完成任务
@@ -189,7 +433,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		let fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		
-		// 按月份分组任务
+		// 按月份分��任务
 		const tasksByMonth = this.groupTasksByMonth(lines);
 		
 		// 检查每个月份是否可以归档
