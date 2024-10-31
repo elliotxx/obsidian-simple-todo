@@ -51,7 +51,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 	}
 
-	// 重新规划前一天未完成的任务
+	// 重新规划上一个任务日期的未完成任务
 	async reschedulePreviousTodos() {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) return;
@@ -59,15 +59,72 @@ export default class SimpleTodoPlugin extends Plugin {
 		const content = await this.app.vault.read(activeFile);
 		const lines = content.split('\n');
 		const today = moment().format('YYYY-MM-DD');
-		const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
 
-		// 找到昨天的未完成任务
-		const unfinishedTodos = this.findUnfinishedTodos(lines, yesterday);
-		if (unfinishedTodos.length === 0) return;
+		// 找到最近的一天的日期和未完成任务
+		const { previousDate, unfinishedTodos } = this.findLatestUnfinishedTodos(lines, today);
+		
+		if (!previousDate || unfinishedTodos.length === 0) {
+			// 如果没有找到之前的未完成任务，直接返回
+			return;
+		}
 
 		// 将任务添加到今天
 		const newContent = this.addTodosToToday(content, unfinishedTodos, today);
 		await this.app.vault.modify(activeFile, newContent);
+	}
+
+	// 辅助方法：查找最近的未完成任务
+	private findLatestUnfinishedTodos(lines: string[], today: string): { previousDate: string | null, unfinishedTodos: string[] } {
+		let currentDate: string | null = null;
+		let previousDate: string | null = null;
+		const unfinishedTodos: string[] = [];
+		const datePattern = /^\d{4}-\d{2}-\d{2}/;
+
+		for (const line of lines) {
+			// 检查是否是日期行
+			const dateMatch = line.match(datePattern);
+			if (dateMatch) {
+				const date = dateMatch[0];
+				if (date === today) {
+					// 如果是今天的日期，跳过
+					continue;
+				}
+				currentDate = date;
+				// 如果已经找到了未完成的任务，就不需要继续查找了
+				if (unfinishedTodos.length > 0) {
+					break;
+				}
+			}
+
+			// 如果有当前日期，并且找到了未完成的任务
+			if (currentDate && line.match(/^- \[[ /]\] /)) {
+				if (unfinishedTodos.length === 0) {
+					// 记录第一个找到未完成任务的日期
+					previousDate = currentDate;
+				}
+				unfinishedTodos.push(line);
+			}
+		}
+
+		return { previousDate, unfinishedTodos };
+	}
+
+	// 辅助方法：添加任务到今天
+	private addTodosToToday(content: string, todos: string[], today: string): string {
+		const lines = content.split('\n');
+		const todayPattern = new RegExp(`^${today}`);
+		const todayIndex = lines.findIndex(line => todayPattern.test(line));
+
+		if (todayIndex === -1) {
+			// 如果找不到今天的日期，在文件开头添加
+			const weekday = moment(today).format('dddd');
+			const todayHeader = `${today} ${weekday}`;
+			return todayHeader + '\n' + todos.join('\n') + '\n\n' + content;
+		} else {
+			// 在今天的日期下添加任务
+			lines.splice(todayIndex + 1, 0, ...todos);
+			return lines.join('\n');
+		}
 	}
 
 	// 归档已完成任务
@@ -96,41 +153,5 @@ export default class SimpleTodoPlugin extends Plugin {
 		// 从原文件中删除已完成任务
 		const newContent = lines.filter(line => !line.match(/^- \[x\] /)).join('\n');
 		await this.app.vault.modify(activeFile, newContent);
-	}
-
-	// 辅助方法：查找未完成任务
-	private findUnfinishedTodos(lines: string[], date: string): string[] {
-		let isInDate = false;
-		const unfinishedTodos: string[] = [];
-
-		for (const line of lines) {
-			if (line.includes(date)) {
-				isInDate = true;
-				continue;
-			}
-			if (isInDate && line.match(/^- \[[ /]\] /)) {
-				unfinishedTodos.push(line);
-			}
-			if (isInDate && line.match(/^\d{4}-\d{2}-\d{2}/)) {
-				break;
-			}
-		}
-
-		return unfinishedTodos;
-	}
-
-	// 辅助方法：添加任务到今天
-	private addTodosToToday(content: string, todos: string[], today: string): string {
-		const lines = content.split('\n');
-		const todayIndex = lines.findIndex(line => line.includes(today));
-
-		if (todayIndex === -1) {
-			// 如果找不到今天的日期，在文件末尾添加
-			return content + '\n\n' + today + '\n' + todos.join('\n');
-		} else {
-			// 在今天的日期下添加任务
-			lines.splice(todayIndex + 1, 0, ...todos);
-			return lines.join('\n');
-		}
 	}
 }
