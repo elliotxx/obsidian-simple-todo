@@ -29,7 +29,7 @@ export const TodoDiffViewer: React.FC<TodoDiffViewerProps> = ({ diffResult, onCl
   return (
     <div className="todo-diff-viewer">
       <div className="todo-diff-header">
-        <h3>变更对比</h3>
+        <h3>变更前后对比</h3>
       </div>
       <div className="todo-diff-content">
         <ReactDiffViewer

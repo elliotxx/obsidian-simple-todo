@@ -3,7 +3,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 90vw;
+  width: 80vw;
   height: 80vh;
   background-color: var(--background-primary);
   border-radius: 8px;
@@ -112,48 +112,66 @@
 .todo-diff-content table {
   width: 100%;
   table-layout: fixed;
-  margin: 0;
   border-spacing: 0;
+  border-collapse: collapse;
+}
+
+/* 统一所有单元格的基础样式 */
+.todo-diff-content td {
+  padding: 2px 0;
+  vertical-align: top;
+  line-height: 1.5;
+  height: 24px !important;
 }
 
 /* 行号列 */
 .todo-diff-content td:nth-child(1),
 .todo-diff-content td:nth-child(4) {
-  width: 60px !important;
-  min-width: 60px !important;
-  max-width: 60px !important;
-  padding-right: 8px !important;
+  width: 45px !important;
+  min-width: 45px !important;
+  padding-right: 4px !important;
   text-align: right;
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
-/* 变更指示器列（+/-/空格列） */
+/* 变更指示器列 */
 .todo-diff-content td:nth-child(2),
 .todo-diff-content td:nth-child(5) {
-  width: 30px !important;
-  min-width: 30px !important;
-  max-width: 30px !important;
-  padding: 0 4px !important;
+  width: 25px !important;
+  min-width: 25px !important;
   text-align: center;
+  padding: 0 !important;
 }
 
 /* 内容列 */
 .todo-diff-content td:nth-child(3),
 .todo-diff-content td:nth-child(6) {
-  width: calc(50% - 90px) !important;  /* 减去行号列和变更指示器列的宽度 */
-  padding-left: 8px !important;
-  padding-right: 16px !important;
+  width: calc(50% - 70px) !important;
+  padding-left: 4px !important;
+  padding-right: 12px !important;
 }
 
-/* 修改行号的样式 */
-.todo-diff-content td:nth-child(1) span,
-.todo-diff-content td:nth-child(4) span {
-  font-size: 12px;
-  color: var(--text-muted);
-  opacity: 0.8;
-}
-
-/* 确保内容不会溢出 */
-.todo-diff-content td {
-  word-break: break-all;
+/* 统一文本样式 */
+.todo-diff-content pre {
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 14px;
+  line-height: 1.5 !important;
   white-space: pre-wrap;
+}
+
+/* 移除多余的空间 */
+.todo-diff-content td > div {
+  min-height: unset !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 确保变更标记对齐 */
+.todo-diff-content td > div > span {
+  line-height: 1.5 !important;
+  height: 20px !important;
+  display: inline-flex !important;
+  align-items: center !important;
 }
