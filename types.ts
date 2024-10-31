@@ -9,3 +9,8 @@ export interface TodoItem {
     status: TodoStatus;
     date: string;
 } 
+
+export interface DiffResult {
+	oldContent: string;
+	newContent: string;
+}

@@ -30,5 +30,8 @@
 		"obsidian": "latest",
 		"tslib": "2.4.0",
 		"typescript": "4.7.4"
+	},
+	"dependencies": {
+		"react-diff-viewer": "^3.1.1"
 	}
 }

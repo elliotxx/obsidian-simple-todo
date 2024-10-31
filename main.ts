@@ -1,5 +1,8 @@
-import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition } from 'obsidian';
-import { TodoItem, TodoStatus } from './types';
+import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
+import { TodoItem, TodoStatus, DiffResult } from './types';
+import * as React from 'react';
+import * as ReactDOM from 'react-dom';
+import { TodoDiffViewer } from './components/TodoDiffViewer';
 
 export default class SimpleTodoPlugin extends Plugin {
 	async onload() {
@@ -17,7 +20,14 @@ export default class SimpleTodoPlugin extends Plugin {
 		this.addCommand({
 			id: 'reschedule-previous-todos',
 			name: 'Reschedule Previous Day Todos',
-			callback: () => this.reschedulePreviousTodos()
+			callback: async () => {
+				const diffResult = await this.reschedulePreviousTodos();
+				if (diffResult) {
+					// 创建一个新的 modal 来显示 diff
+					const modal = new TodoDiffModal(this.app, diffResult);
+					modal.open();
+				}
+			}
 		});
 
 		this.addCommand({
@@ -93,11 +103,11 @@ export default class SimpleTodoPlugin extends Plugin {
 	}
 
 	// 重新规划上一个任务日期的未完成任务
-	async reschedulePreviousTodos() {
+	async reschedulePreviousTodos(): Promise<DiffResult | null> {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView) {
 			console.log('No active markdown view found');
-			return;
+			return null;
 		}
 
 		const editor = activeView.editor;
@@ -105,46 +115,55 @@ export default class SimpleTodoPlugin extends Plugin {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
 			console.log('No active file found');
-			return;
+			return null;
 		}
 
 		console.log('Starting to reschedule previous todos...');
-		let fileContent = await this.app.vault.read(activeFile);
+		const fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
-		// 找到最近的一天的日期和未完成任务
 		const { previousDate, unfinishedTodos, todoLineNumbers } = this.findLatestUnfinishedTodos(lines, today);
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
 			console.log('No unfinished todos found from previous dates');
 			new Notice('没有找到未完成的任务');
-			return;
+			return null;
 		}
 
-		console.log(`Found ${unfinishedTodos.length} unfinished todos from ${previousDate}`);
-		
-		// 在光标处添加任务
-		await this.insertTodosAtCursor(editor, cursor, unfinishedTodos, today);
-		
-		// 从原位置删除已移动的任务
-		fileContent = this.removeTodosFromOriginal(fileContent, todoLineNumbers);
-		await this.app.vault.modify(activeFile, fileContent);
-		
-		console.log('Successfully rescheduled todos to cursor position and removed from original location');
-		new Notice(`已重新规划 ${unfinishedTodos.length} 个任务`);
+		// 创建预览内容
+		const previewContent = await this.createPreviewContent(
+			fileContent,
+			todoLineNumbers,
+			unfinishedTodos,
+			today,
+			cursor
+		);
+
+		return {
+			oldContent: fileContent,
+			newContent: previewContent
+		};
 	}
 
-	// 在光标处插入任务
-	private async insertTodosAtCursor(editor: Editor, cursor: EditorPosition, todos: string[], today: string) {
-		const lines = editor.getValue().split('\n');
-		const datePattern = new RegExp(`^${today}`);
+	// 添加新方法用于创建预览内容
+	private async createPreviewContent(
+		originalContent: string,
+		todoLineNumbers: number[],
+		unfinishedTodos: string[],
+		today: string,
+		cursor: EditorPosition
+	): Promise<string> {
+		// 创建内容副本
+		const lines = originalContent.split('\n');
+		const previewLines = [...lines];
 		
-		// 查找今天的日期行
-		const todayLineIndex = lines.findIndex(line => datePattern.test(line));
+		// 模拟在光标处添加任务
+		const datePattern = new RegExp(`^${today}`);
+		const todayLineIndex = previewLines.findIndex(line => datePattern.test(line));
 		
 		if (todayLineIndex === -1) {
-			// 如果今天的日期不存在，直接创建新的日期和任务
+			// 如果今天的日期不存在，创建新的日期和任务
 			const weekday = moment(today).format('dddd')
 				.replace('星期日', '周日')
 				.replace('星期一', '周一')
@@ -154,30 +173,17 @@ export default class SimpleTodoPlugin extends Plugin {
 				.replace('星期五', '周五')
 				.replace('星期六', '周六');
 			
-			const insertContent = `${today} ${weekday}\n${todos.join('\n')}\n`;
-			
-			editor.transaction({
-				changes: [{
-					from: {
-						line: cursor.line,
-						ch: 0
-					},
-					to: {
-						line: cursor.line,
-						ch: 0
-					},
-					text: insertContent
-				}]
-			});
+			const insertContent = `${today} ${weekday}\n${unfinishedTodos.join('\n')}`;
+			previewLines.splice(cursor.line, 0, insertContent);
 		} else {
-			// 如果今天的日期已存在，需要合并任务
-			const todayTasks = this.getTodayTasks(lines, todayLineIndex);
-			const mergedTasks = this.mergeTasks(todayTasks, todos);
+			// 如果今天的日期已存在，合并任务
+			const todayTasks = this.getTodayTasks(previewLines, todayLineIndex);
+			const mergedTasks = this.mergeTasks(todayTasks, unfinishedTodos);
 			
 			// 找到今天任务的结束位置
 			let endIndex = todayLineIndex + 1;
-			for (let i = todayLineIndex + 1; i < lines.length; i++) {
-				const line = lines[i];
+			for (let i = todayLineIndex + 1; i < previewLines.length; i++) {
+				const line = previewLines[i];
 				if (line.match(/^\d{4}-\d{2}-\d{2}/) || line.trim() === '') {
 					break;
 				}
@@ -185,20 +191,15 @@ export default class SimpleTodoPlugin extends Plugin {
 			}
 			
 			// 替换今天的所有任务
-			editor.transaction({
-				changes: [{
-					from: {
-						line: todayLineIndex + 1,
-						ch: 0
-					},
-					to: {
-						line: endIndex,
-						ch: 0
-					},
-					text: mergedTasks.join('\n') + '\n'
-				}]
-			});
+			previewLines.splice(todayLineIndex + 1, endIndex - todayLineIndex - 1, ...mergedTasks);
 		}
+		
+		// 从原位置删除任务
+		for (let i = todoLineNumbers.length - 1; i >= 0; i--) {
+			previewLines.splice(todoLineNumbers[i], 1);
+		}
+		
+		return previewLines.join('\n');
 	}
 
 	// 获取今天的任务
@@ -283,7 +284,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	// 获取较高的状态
 	private getHigherStatus(status1: string, status2: string): string {
-		const statusPriority = { 'x': 3, '/': 2, ' ': 1 };
+		const statusPriority: Record<string, number> = { 'x': 3, '/': 2, ' ': 1 };
 		return statusPriority[status1] >= statusPriority[status2] ? status1 : status2;
 	}
 
@@ -546,7 +547,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			// 递归处理上层父任务
 			this.handleParentTasks(lines, parentLineNum, parentIndent);
 		} else {
-			// 如果还有其他子任务，检查它们的状态
+			// 如果还有其他子任务，查它们的状态
 			const allChildrenCompleted = this.areAllChildrenCompleted(lines, parentLineNum, parentIndent);
 			if (allChildrenCompleted) {
 				// 如果所有剩余子任务都已完成，更新父任务状态
@@ -775,5 +776,59 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 		
 		return allCompleted;
+	}
+}
+
+// 创建一个 Modal 类来显示 diff
+class TodoDiffModal extends Modal {
+	private originalContent: string;
+	private todoLineNumbers: number[];
+	private unfinishedTodos: string[];
+
+	constructor(app: App, private diffResult: DiffResult) {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		// @ts-ignore
+		ReactDOM.render(
+			React.createElement(TodoDiffViewer, {
+				diffResult: this.diffResult,
+				onClose: () => this.close(),
+				onConfirm: async () => {
+					// 执行实际的任务移动操作
+					await this.confirmChanges();
+					this.close();
+				}
+			}),
+			contentEl
+		);
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		ReactDOM.unmountComponentAtNode(contentEl);
+	}
+
+	private async confirmChanges() {
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
+		if (!activeView || !this.diffResult) {
+			return;
+		}
+
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) {
+			return;
+		}
+
+		try {
+			// 将新内容写入文件
+			await this.app.vault.modify(activeFile, this.diffResult.newContent);
+			new Notice('任务已重新规划');
+		} catch (error) {
+			console.error('Failed to update file:', error);
+			new Notice('更新文件失败');
+		}
 	}
 }

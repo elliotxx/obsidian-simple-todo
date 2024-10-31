@@ -1,8 +1,159 @@
-/*
+.todo-diff-viewer {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  height: 80vh;
+  background-color: var(--background-primary);
+  border-radius: 8px;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+}
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+.todo-diff-header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
 
-If your plugin does not need CSS, delete this file.
+.todo-diff-header h3 {
+  margin: 0;
+  font-size: 1.2em;
+}
 
-*/
+.todo-diff-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  min-height: 0;
+}
+
+.todo-diff-content > div {
+  height: 100%;
+  margin: 0;
+}
+
+.todo-diff-content pre {
+  margin: 0;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.todo-diff-content table {
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+  border-spacing: 0;
+}
+
+.todo-diff-content td {
+  vertical-align: top;
+  padding: 0;
+  width: 50%;
+}
+
+.todo-diff-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--background-modifier-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.todo-diff-footer button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background-color: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.todo-diff-footer button:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todo-diff-footer button.mod-cta {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+}
+
+.todo-diff-footer button.mod-cta:hover {
+  background-color: var(--interactive-accent-hover);
+}
+
+.todo-diff-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.todo-diff-content::-webkit-scrollbar-track {
+  background: var(--background-secondary);
+  border-radius: 4px;
+}
+
+.todo-diff-content::-webkit-scrollbar-thumb {
+  background: var(--background-modifier-border);
+  border-radius: 4px;
+}
+
+.todo-diff-content::-webkit-scrollbar-thumb:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* 调整表格布局 */
+.todo-diff-content table {
+  width: 100%;
+  table-layout: fixed;
+  margin: 0;
+  border-spacing: 0;
+}
+
+/* 行号列 */
+.todo-diff-content td:nth-child(1),
+.todo-diff-content td:nth-child(4) {
+  width: 60px !important;
+  min-width: 60px !important;
+  max-width: 60px !important;
+  padding-right: 8px !important;
+  text-align: right;
+}
+
+/* 变更指示器列（+/-/空格列） */
+.todo-diff-content td:nth-child(2),
+.todo-diff-content td:nth-child(5) {
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  padding: 0 4px !important;
+  text-align: center;
+}
+
+/* 内容列 */
+.todo-diff-content td:nth-child(3),
+.todo-diff-content td:nth-child(6) {
+  width: calc(50% - 90px) !important;  /* 减去行号列和变更指示器列的宽度 */
+  padding-left: 8px !important;
+  padding-right: 16px !important;
+}
+
+/* 修改行号的样式 */
+.todo-diff-content td:nth-child(1) span,
+.todo-diff-content td:nth-child(4) span {
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+/* 确保内容不会溢出 */
+.todo-diff-content td {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
