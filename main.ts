@@ -3,11 +3,15 @@ import { TodoItem, TodoStatus } from './types';
 
 export default class SimpleTodoPlugin extends Plugin {
 	async onload() {
+		console.log('Loading Simple Todo plugin...');
 		// 注册插件命令
 		this.addCommand({
 			id: 'toggle-todo-status',
 			name: 'Toggle Todo Status',
-			callback: () => this.toggleTodoStatus()
+			hotkeys: [{ modifiers: ["Mod"], key: "Enter" }],
+			editorCallback: (editor: Editor) => {
+				this.toggleTodoStatus();
+			}
 		});
 
 		this.addCommand({
@@ -26,23 +30,52 @@ export default class SimpleTodoPlugin extends Plugin {
 	// 切换任务状态
 	async toggleTodoStatus() {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-		if (!activeView) return;
+		if (!activeView) {
+			console.log('No active markdown view found');
+			return;
+		}
 
 		const editor = activeView.editor;
 		const cursor = editor.getCursor();
 		const line = editor.getLine(cursor.line);
 		
-		const todoPattern = /^- \[([ x/])\] /;
-		if (todoPattern.test(line)) {
-			const currentStatus = line.match(todoPattern)[1];
+		console.log('Current line:', line);
+
+		const todoPattern = /^[\t ]*- \[([ x/])\] /;
+		const match = line.match(todoPattern);
+		
+		if (match) {
+			const currentStatus = match[1];
 			const newStatus = this.getNextStatus(currentStatus);
-			const newLine = line.replace(todoPattern, `- [${newStatus}] `);
-			editor.setLine(cursor.line, newLine);
+			console.log(`Toggling todo status: ${currentStatus} -> ${newStatus}`);
+			
+			const indentation = line.match(/^[\t ]*/)[0];
+			const taskContent = line.replace(todoPattern, '');
+			const newLine = `${indentation}- [${newStatus}] ${taskContent}`;
+			
+			editor.transaction({
+				changes: [{
+					from: {
+						line: cursor.line,
+						ch: 0
+					},
+					to: {
+						line: cursor.line,
+						ch: line.length
+					},
+					text: newLine
+				}]
+			});
+
+			new Notice(`任务状态已更改: ${this.getStatusText(currentStatus)} -> ${this.getStatusText(newStatus)}`);
+		} else {
+			console.log('No todo item found at current line');
 		}
 	}
 
 	// 获取下一个状态
 	getNextStatus(currentStatus: string): string {
+		console.log('Current status:', currentStatus);
 		switch (currentStatus) {
 			case ' ': return '/';  // 待办 -> 进行中
 			case '/': return 'x';  // 进行中 -> 已完成
@@ -51,26 +84,43 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 	}
 
+	// 获取状态文本说明
+	private getStatusText(status: string): string {
+		switch (status) {
+			case ' ': return '待办';
+			case '/': return '进行中';
+			case 'x': return '已完成';
+			default: return '未知状态';
+		}
+	}
+
 	// 重新规划上一个任务日期的未完成任务
 	async reschedulePreviousTodos() {
 		const activeFile = this.app.workspace.getActiveFile();
-		if (!activeFile) return;
+		if (!activeFile) {
+			console.log('No active file found');
+			return;
+		}
 
-		const content = await this.app.vault.read(activeFile);
-		const lines = content.split('\n');
+		console.log('Starting to reschedule previous todos...');
+		const fileContent = await this.app.vault.read(activeFile);
+		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
 		// 找到最近的一天的日期和未完成任务
 		const { previousDate, unfinishedTodos } = this.findLatestUnfinishedTodos(lines, today);
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
-			// 如果没有找到之前的未完成任务，直接返回
+			console.log('No unfinished todos found from previous dates');
 			return;
 		}
 
+		console.log(`Found ${unfinishedTodos.length} unfinished todos from ${previousDate}`);
+		
 		// 将任务添加到今天
-		const newContent = this.addTodosToToday(content, unfinishedTodos, today);
+		const newContent = this.addTodosToToday(fileContent, unfinishedTodos, today);
 		await this.app.vault.modify(activeFile, newContent);
+		console.log('Successfully rescheduled todos to today');
 	}
 
 	// 辅助方法：查找最近的未完成任务
@@ -130,8 +180,12 @@ export default class SimpleTodoPlugin extends Plugin {
 	// 归档已完成任务
 	async archiveCompletedTodos() {
 		const activeFile = this.app.workspace.getActiveFile();
-		if (!activeFile) return;
+		if (!activeFile) {
+			console.log('No active file found');
+			return;
+		}
 
+		console.log('Starting to archive completed todos...');
 		let fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		
@@ -140,33 +194,54 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		// 检查每个月份是否可以归档
 		for (const [month, tasks] of Object.entries(tasksByMonth)) {
+			console.log(`Processing tasks for ${month}...`);
 			const hasUnfinishedTasks = tasks.some(task => task.match(/^- \[[ /]\] /));
 			if (hasUnfinishedTasks) {
+				console.log(`${month} has unfinished tasks, skipping...`);
 				new Notice(`${month} 还有未完成的任务，无法归档该月份的任务`);
 				continue;
 			}
 
 			// 获取该月份的已完成任务
 			const completedTasks = tasks.filter(task => task.match(/^- \[x\] /));
-			if (completedTasks.length === 0) continue;
+			if (completedTasks.length === 0) {
+				console.log(`No completed tasks found for ${month}`);
+				continue;
+			}
+
+			console.log(`Found ${completedTasks.length} completed tasks for ${month}`);
 
 			// 确保归档目录存在
 			const archiveDirPath = 'simple-todo';
 			if (!await this.ensureArchiveDirectory(archiveDirPath)) {
+				console.error('Failed to create archive directory');
 				new Notice('无法创建归档目录');
 				return;
 			}
 
 			// 创建或更新归档文件
 			const archiveFileName = `${archiveDirPath}/archive-${month}.md`;
-			await this.updateArchiveFile(archiveFileName, completedTasks, month);
+			try {
+				await this.updateArchiveFile(archiveFileName, completedTasks, month);
+				console.log(`Successfully archived tasks to ${archiveFileName}`);
+			} catch (error) {
+				console.error(`Failed to update archive file: ${error}`);
+				continue;
+			}
 
 			// 从原文件中删除已归档的任务
 			fileContent = this.removeArchivedTasks(fileContent, completedTasks);
+			console.log(`Removed ${completedTasks.length} archived tasks from original file`);
 		}
 
 		// 更新原文件
-		await this.app.vault.modify(activeFile, fileContent);
+		try {
+			await this.app.vault.modify(activeFile, fileContent);
+			console.log('Successfully updated original file');
+		} catch (error) {
+			console.error(`Failed to update original file: ${error}`);
+			new Notice('更新原文件失败');
+		}
 	}
 
 	// 按月份分组任务
