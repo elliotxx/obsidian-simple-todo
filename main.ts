@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, Notice, moment } from 'obsidian';
+import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor } from 'obsidian';
 import { TodoItem, TodoStatus } from './types';
 
 export default class SimpleTodoPlugin extends Plugin {
@@ -25,7 +25,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	// 切换任务状态
 	async toggleTodoStatus() {
-		const activeView = this.app.workspace.getActiveViewOfType('markdown');
+		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView) return;
 
 		const editor = activeView.editor;
@@ -132,8 +132,8 @@ export default class SimpleTodoPlugin extends Plugin {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) return;
 
-		const content = await this.app.vault.read(activeFile);
-		const lines = content.split('\n');
+		let fileContent = await this.app.vault.read(activeFile);
+		const lines = fileContent.split('\n');
 		
 		// 按月份分组任务
 		const tasksByMonth = this.groupTasksByMonth(lines);
@@ -142,7 +142,6 @@ export default class SimpleTodoPlugin extends Plugin {
 		for (const [month, tasks] of Object.entries(tasksByMonth)) {
 			const hasUnfinishedTasks = tasks.some(task => task.match(/^- \[[ /]\] /));
 			if (hasUnfinishedTasks) {
-				// 如果存在未完成任务，显示通知并跳过该月份
 				new Notice(`${month} 还有未完成的任务，无法归档该月份的任务`);
 				continue;
 			}
@@ -163,11 +162,11 @@ export default class SimpleTodoPlugin extends Plugin {
 			await this.updateArchiveFile(archiveFileName, completedTasks, month);
 
 			// 从原文件中删除已归档的任务
-			content = this.removeArchivedTasks(content, completedTasks);
+			fileContent = this.removeArchivedTasks(fileContent, completedTasks);
 		}
 
 		// 更新原文件
-		await this.app.vault.modify(activeFile, content);
+		await this.app.vault.modify(activeFile, fileContent);
 	}
 
 	// 按月份分组任务

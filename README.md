@@ -73,7 +73,7 @@
 ### 环境准备
 
 1. 安装 Node.js (推荐使用 LTS 版本)
-2. 安装 pnpm (推荐) 或 npm
+2. 安装 npm
 3. 克隆项目到本地：
 ```bash
 git clone https://github.com/elliotxx/obsidian-simple-todo.git
@@ -84,7 +84,7 @@ git clone https://github.com/elliotxx/obsidian-simple-todo.git
 1. 安装依赖：
 ```bash
 cd obsidian-simple-todo
-pnpm install
+npm install
 ```
 
 2. 创建软链接到测试 vault：
