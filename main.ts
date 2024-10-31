@@ -1,134 +1,136 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, TFile, moment } from 'obsidian';
+import { TodoItem, TodoStatus } from './types';
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
-}
-
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
-
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
-
+export default class SimpleTodoPlugin extends Plugin {
 	async onload() {
-		await this.loadSettings();
-
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+		// 注册插件命令
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
+			id: 'toggle-todo-status',
+			name: 'Toggle Todo Status',
+			callback: () => this.toggleTodoStatus()
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
+
 		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
+			id: 'reschedule-previous-todos',
+			name: 'Reschedule Previous Day Todos',
+			callback: () => this.reschedulePreviousTodos()
 		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
+
 		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
+			id: 'archive-completed-todos',
+			name: 'Archive Completed Todos',
+			callback: () => this.archiveCompletedTodos()
+		});
+	}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
+	// 切换任务状态
+	async toggleTodoStatus() {
+		const activeView = this.app.workspace.getActiveViewOfType('markdown');
+		if (!activeView) return;
+
+		const editor = activeView.editor;
+		const cursor = editor.getCursor();
+		const line = editor.getLine(cursor.line);
+		
+		const todoPattern = /^- \[([ x/])\] /;
+		if (todoPattern.test(line)) {
+			const currentStatus = line.match(todoPattern)[1];
+			const newStatus = this.getNextStatus(currentStatus);
+			const newLine = line.replace(todoPattern, `- [${newStatus}] `);
+			editor.setLine(cursor.line, newLine);
+		}
+	}
+
+	// 获取下一个状态
+	getNextStatus(currentStatus: string): string {
+		switch (currentStatus) {
+			case ' ': return '/';  // 待办 -> 进行中
+			case '/': return 'x';  // 进行中 -> 已完成
+			case 'x': return ' ';  // 已完成 -> 待办
+			default: return ' ';
+		}
+	}
+
+	// 重新规划前一天未完成的任务
+	async reschedulePreviousTodos() {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) return;
+
+		const content = await this.app.vault.read(activeFile);
+		const lines = content.split('\n');
+		const today = moment().format('YYYY-MM-DD');
+		const yesterday = moment().subtract(1, 'day').format('YYYY-MM-DD');
+
+		// 找到昨天的未完成任务
+		const unfinishedTodos = this.findUnfinishedTodos(lines, yesterday);
+		if (unfinishedTodos.length === 0) return;
+
+		// 将任务添加到今天
+		const newContent = this.addTodosToToday(content, unfinishedTodos, today);
+		await this.app.vault.modify(activeFile, newContent);
+	}
+
+	// 归档已完成任务
+	async archiveCompletedTodos() {
+		const activeFile = this.app.workspace.getActiveFile();
+		if (!activeFile) return;
+
+		const content = await this.app.vault.read(activeFile);
+		const lines = content.split('\n');
+		
+		// 找到所有已完成的任务
+		const completedTodos = lines.filter(line => line.match(/^- \[x\] /));
+		if (completedTodos.length === 0) return;
+
+		// 创建归档文件
+		const archiveFileName = `archive-${moment().format('YYYY-MM')}.md`;
+		const archiveFile = this.app.vault.getAbstractFileByPath(archiveFileName) as TFile;
+		
+		if (archiveFile) {
+			const archiveContent = await this.app.vault.read(archiveFile);
+			await this.app.vault.modify(archiveFile, archiveContent + '\n' + completedTodos.join('\n'));
+		} else {
+			await this.app.vault.create(archiveFileName, completedTodos.join('\n'));
+		}
+
+		// 从原文件中删除已完成任务
+		const newContent = lines.filter(line => !line.match(/^- \[x\] /)).join('\n');
+		await this.app.vault.modify(activeFile, newContent);
+	}
+
+	// 辅助方法：查找未完成任务
+	private findUnfinishedTodos(lines: string[], date: string): string[] {
+		let isInDate = false;
+		const unfinishedTodos: string[] = [];
+
+		for (const line of lines) {
+			if (line.includes(date)) {
+				isInDate = true;
+				continue;
 			}
-		});
+			if (isInDate && line.match(/^- \[[ /]\] /)) {
+				unfinishedTodos.push(line);
+			}
+			if (isInDate && line.match(/^\d{4}-\d{2}-\d{2}/)) {
+				break;
+			}
+		}
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		return unfinishedTodos;
 	}
 
-	onunload() {
+	// 辅助方法：添加任务到今天
+	private addTodosToToday(content: string, todos: string[], today: string): string {
+		const lines = content.split('\n');
+		const todayIndex = lines.findIndex(line => line.includes(today));
 
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
-}
-
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
-
-	display(): void {
-		const {containerEl} = this;
-
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+		if (todayIndex === -1) {
+			// 如果找不到今天的日期，在文件末尾添加
+			return content + '\n\n' + today + '\n' + todos.join('\n');
+		} else {
+			// 在今天的日期下添加任务
+			lines.splice(todayIndex + 1, 0, ...todos);
+			return lines.join('\n');
+		}
 	}
 }
