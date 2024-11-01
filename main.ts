@@ -341,12 +341,6 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 	}
 
-	// 获取较高的状态
-	private getHigherStatus(status1: string, status2: string): string {
-		const statusPriority: Record<string, number> = { 'x': 3, '/': 2, ' ': 1 };
-		return statusPriority[status1] >= statusPriority[status2] ? status1 : status2;
-	}
-
 	// 将任务 Map 转换回数组
 	private convertTaskMapToArray(taskMap: Map<string, any>, parentKey: string = '', result: string[] = []): string[] {
 		for (const [key, value] of taskMap.entries()) {
@@ -359,83 +353,6 @@ export default class SimpleTodoPlugin extends Plugin {
 			}
 		}
 		return result;
-	}
-
-	// 更新所有任务的状态
-	private updateAllTasksStatus(lines: string[], todayLineIndex: number): string {
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		const parentTasks = new Map<string, number>(); // 缩进 -> 行号
-		let inTodaySection = false;
-		
-		for (let i = 0; i < lines.length; i++) {
-			const line = lines[i];
-			
-			// 检查是否进入或离开今天的部分
-			if (i === todayLineIndex) {
-				inTodaySection = true;
-				continue;
-			}
-			if (inTodaySection && (line.match(/^\d{4}-\d{2}-\d{2}/) || line.trim() === '')) {
-				inTodaySection = false;
-				continue;
-			}
-			
-			if (!inTodaySection) continue;
-			
-			const match = line.match(todoPattern);
-			if (!match) continue;
-			
-			const [_, indent, status] = match;
-			
-			if (indent.length === 0) {
-				// 顶级任务
-				parentTasks.clear();
-				parentTasks.set(indent, i);
-				
-				// 检查其子任务状态
-				const allChildrenCompleted = this.checkChildrenStatus(lines, i, indent);
-				if (allChildrenCompleted) {
-					lines[i] = this.setTaskStatus(lines[i], 'x');
-				} else {
-					// 如果有未完成的子任务，确保父任务不是完成状态
-					const currentStatus = status;
-					if (currentStatus === 'x') {
-						lines[i] = this.setTaskStatus(lines[i], ' ');
-					}
-				}
-			} else {
-				// 子任务
-				let parentIndent = '';
-				for (const [pIndent, pLine] of parentTasks.entries()) {
-					if (pIndent.length < indent.length) {
-						if (parentIndent.length < pIndent.length) {
-							parentIndent = pIndent;
-						}
-					}
-				}
-				
-				if (parentIndent !== '') {
-					const parentLineNum = parentTasks.get(parentIndent);
-					if (parentLineNum !== undefined) {
-						const allChildrenCompleted = this.checkChildrenStatus(lines, parentLineNum, parentIndent);
-						if (allChildrenCompleted) {
-							lines[parentLineNum] = this.setTaskStatus(lines[parentLineNum], 'x');
-						} else {
-							// 如果有未完成的子任务，确保父任务不是完成状态
-							const parentLine = lines[parentLineNum];
-							const parentStatus = parentLine.match(todoPattern)?.[2];
-							if (parentStatus === 'x') {
-								lines[parentLineNum] = this.setTaskStatus(parentLine, ' ');
-							}
-						}
-					}
-				}
-				
-				parentTasks.set(indent, i);
-			}
-		}
-		
-		return lines.join('\n');
 	}
 
 	// 辅助方法：查找最近的未完成任务（包括父任务）
@@ -556,135 +473,6 @@ export default class SimpleTodoPlugin extends Plugin {
 			return false;
 		}
 		
-		return true;
-	}
-
-	// 从原位置删除已移动的任务
-	private removeTodosFromOriginal(content: string, lineNumbers: number[]): string {
-		const lines = content.split('\n');
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		
-		// 从后往前处理每个任务
-		for (let i = lineNumbers.length - 1; i >= 0; i--) {
-			const currentLineNum = lineNumbers[i];
-			const currentLine = lines[currentLineNum];
-			const indentMatch = currentLine.match(/^([\t ]*)/);
-			const currentIndent = indentMatch ? indentMatch[1] : '';
-			
-			// 删除当前任务
-			lines.splice(currentLineNum, 1);
-			
-			// 检查并处理父任务
-			this.handleParentTasks(lines, currentLineNum, currentIndent);
-		}
-		
-		return lines.join('\n');
-	}
-
-	// 处理父任务
-	private handleParentTasks(lines: string[], currentLineNum: number, currentIndent: string) {
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		let parentLineNum = -1;
-		let parentIndent = '';
-		
-		// 从当前行向上查找父任务
-		for (let i = currentLineNum - 1; i >= 0; i--) {
-			const line = lines[i];
-			const match = line.match(todoPattern);
-			if (!match) continue;
-			
-			const [_, indent] = match;
-			if (indent.length < currentIndent.length) {
-				parentLineNum = i;
-				parentIndent = indent;
-				break;
-			}
-		}
-		
-		if (parentLineNum === -1) return;
-		
-		// 检查父任务是否还有其他子任务
-		const hasOtherChildren = this.checkForRemainingChildren(lines, parentLineNum, parentIndent);
-		
-		if (!hasOtherChildren) {
-			// 如果没有其他子任务，删除父任务
-			lines.splice(parentLineNum, 1);
-			// 递归处理上层父任务
-			this.handleParentTasks(lines, parentLineNum, parentIndent);
-		} else {
-			// 如果还有其他子任务，查它们的状态
-			const allChildrenCompleted = this.areAllChildrenCompleted(lines, parentLineNum, parentIndent);
-			if (allChildrenCompleted) {
-				// 如果所有剩余子任务都已完成，更新父任务状态
-				lines[parentLineNum] = this.setTaskStatus(lines[parentLineNum], 'x');
-			}
-		}
-	}
-
-	// 检查是否还有其他子任务
-	private checkForRemainingChildren(lines: string[], parentLineNum: number, parentIndent: string): boolean {
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		
-		for (let i = parentLineNum + 1; i < lines.length; i++) {
-			const line = lines[i];
-			const match = line.match(todoPattern);
-			if (!match) continue;
-			
-			const [_, indent] = match;
-			// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
-			if (indent.length <= parentIndent.length) {
-				break;
-			}
-			// 找到了子任务
-			return true;
-		}
-		
-		return false;
-	}
-
-	// 检查所有子任务是否都已完成
-	private areAllChildrenCompleted(lines: string[], parentLineNum: number, parentIndent: string): boolean {
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		
-		for (let i = parentLineNum + 1; i < lines.length; i++) {
-			const line = lines[i];
-			const match = line.match(todoPattern);
-			if (!match) continue;
-			
-			const [_, indent, status] = match;
-			// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
-			if (indent.length <= parentIndent.length) {
-				break;
-			}
-			// 如果找到未完成的子任务，返回 false
-			if (status !== 'x') {
-				return false;
-			}
-		}
-		
-		return true;
-	}
-
-	// 设置任务状态
-	private setTaskStatus(line: string, status: string): string {
-		return line.replace(/\[([ x/])\]/, `[${status}]`);
-	}
-
-	// 判断是否应该删除任务
-	private shouldDeleteTask(lines: string[], lineNum: number, currentIndent: string): boolean {
-		// 检查下一行是否存在且是任务
-		const nextLine = lines[lineNum + 1];
-		if (!nextLine) return true;  // 如果是最后一行，可以删除
-		
-		// 获取下一行的缩进
-		const nextIndent = nextLine.match(/^[\t ]*/)?.[0] || '';
-		
-		// 如果下一行的缩进更深，说明当前任务有子任务，不应该删除
-		if (nextIndent.length > currentIndent.length && nextLine.includes('- [')) {
-			return false;
-		}
-		
-		// 如果下一行缩进相同或更浅，可以删除当前任务
 		return true;
 	}
 
@@ -816,40 +604,10 @@ export default class SimpleTodoPlugin extends Plugin {
 		const archivedTasksSet = new Set(archivedTasks);
 		return lines.filter(line => !archivedTasksSet.has(line)).join('\n');
 	}
-
-	// 检查子任务状态
-	private checkChildrenStatus(lines: string[], parentLineNum: number, parentIndent: string): boolean {
-		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]/;
-		let allCompleted = true;
-		
-		for (let i = parentLineNum + 1; i < lines.length; i++) {
-			const line = lines[i];
-			const match = line.match(todoPattern);
-			if (!match) continue;
-			
-			const [_, indent, status] = match;
-			// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
-			if (indent.length <= parentIndent.length) {
-				break;
-			}
-			
-			// 如果有任何未完成的子任务
-			if (status !== 'x') {
-				allCompleted = false;
-				break;
-			}
-		}
-		
-		return allCompleted;
-	}
 }
 
 // 创建一个 Modal 类来显示 diff
 class TodoDiffModal extends Modal {
-	private originalContent: string;
-	private todoLineNumbers: number[];
-	private unfinishedTodos: string[];
-
 	constructor(app: App, private diffResult: DiffResult) {
 		super(app);
 	}
