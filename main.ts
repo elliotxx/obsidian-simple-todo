@@ -231,8 +231,34 @@ export default class SimpleTodoPlugin extends Plugin {
 				previewLines.splice(lineNum, 1);
 			}
 		}
-		
-		return previewLines.join('\n');
+
+		// 确保日期之间只有一个空行
+		const result: string[] = [];
+		let lastLineWasDate = false;
+		let emptyLineCount = 0;
+
+		for (let i = 0; i < previewLines.length; i++) {
+			const line = previewLines[i];
+			const isDate = line.match(/^\d{4}-\d{2}-\d{2}/);
+			const isEmpty = line.trim() === '';
+
+			if (isEmpty) {
+				if (lastLineWasDate) {
+					if (emptyLineCount === 0) {
+						result.push(line);
+						emptyLineCount++;
+					}
+				} else {
+					result.push(line);
+				}
+			} else {
+				result.push(line);
+				lastLineWasDate = isDate !== null;
+				emptyLineCount = 0;
+			}
+		}
+
+		return result.join('\n');
 	}
 
 	// 获取今天的任务
