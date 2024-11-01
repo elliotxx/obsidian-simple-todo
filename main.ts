@@ -123,7 +123,10 @@ export default class SimpleTodoPlugin extends Plugin {
 		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
-		const { previousDate, unfinishedTodos, todoLineNumbers } = this.findLatestUnfinishedTodos(lines, today);
+		const { previousDate, unfinishedTodos, unfinishedTodoLineNumbers } = this.findLatestUnfinishedTodos(lines, today);
+		console.log('Previous date:', previousDate);
+		console.log('Unfinished todos:', unfinishedTodos);
+		console.log('Unfinished todos line numbers:', unfinishedTodoLineNumbers);
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
 			console.log('No unfinished todos found from previous dates');
@@ -134,7 +137,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		// 创建预览内容
 		const previewContent = await this.createPreviewContent(
 			fileContent,
-			todoLineNumbers,
+			unfinishedTodoLineNumbers,
 			unfinishedTodos,
 			today,
 			cursor
@@ -149,7 +152,7 @@ export default class SimpleTodoPlugin extends Plugin {
 	// 添加新方法用于创建预览内容
 	private async createPreviewContent(
 		originalContent: string,
-		todoLineNumbers: number[],
+		unfinishedTodoLineNumbers: number[],
 		unfinishedTodos: string[],
 		today: string,
 		cursor: EditorPosition
@@ -195,8 +198,8 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 		
 		// 从原位置删除任务
-		for (let i = todoLineNumbers.length - 1; i >= 0; i--) {
-			previewLines.splice(todoLineNumbers[i], 1);
+		for (let i = unfinishedTodoLineNumbers.length - 1; i >= 0; i--) {
+			previewLines.splice(unfinishedTodoLineNumbers[i], 1);
 		}
 		
 		return previewLines.join('\n');
@@ -383,12 +386,12 @@ export default class SimpleTodoPlugin extends Plugin {
 	private findLatestUnfinishedTodos(lines: string[], today: string): { 
 		previousDate: string | null, 
 		unfinishedTodos: string[],
-		todoLineNumbers: number[]
+		unfinishedTodoLineNumbers: number[]
 	} {
 		let currentDate: string | null = null;
 		let previousDate: string | null = null;
 		const unfinishedTodos: string[] = [];
-		const todoLineNumbers: number[] = [];
+		const unfinishedTodoLineNumbers: number[] = [];
 		const datePattern = /^\d{4}-\d{2}-\d{2}/;
 		const todoPattern = /^[\t ]*- \[[ /]\] /;
 
@@ -397,7 +400,10 @@ export default class SimpleTodoPlugin extends Plugin {
 			line: string;
 			lineNumber: number;
 			indent: string;
-			parents: string[];
+			parents: Array<{
+				line: string;
+				lineNumber: number;
+			}>;
 		}
 		const taskInfos: TaskInfo[] = [];
 
@@ -429,7 +435,7 @@ export default class SimpleTodoPlugin extends Plugin {
 					
 					taskInfos.push({
 						line,
-						lineNumber: i,
+						lineNumber: i+1,
 						indent: currentIndent,
 						parents
 					});
@@ -437,25 +443,28 @@ export default class SimpleTodoPlugin extends Plugin {
 			}
 		}
 
+		console.log("taskInfos", taskInfos)
+
 		// 处理收集到的任务信息
 		for (const taskInfo of taskInfos) {
 			// 首先添加所有父任务（如果还没有添加过）
 			for (const parent of taskInfo.parents) {
-				if (!unfinishedTodos.includes(parent)) {
-					unfinishedTodos.push(parent);
+				if (!unfinishedTodos.includes(parent.line)) {
+					unfinishedTodos.push(parent.line);
+					unfinishedTodoLineNumbers.push(parent.lineNumber);
 				}
 			}
 			// 然后添加当前任务
 			unfinishedTodos.push(taskInfo.line);
-			todoLineNumbers.push(taskInfo.lineNumber);
+			unfinishedTodoLineNumbers.push(taskInfo.lineNumber);
 		}
 
-		return { previousDate, unfinishedTodos, todoLineNumbers };
+		return { previousDate, unfinishedTodos, unfinishedTodoLineNumbers };
 	}
 
 	// 查找父任务
-	private findParentTasks(lines: string[], currentLineNum: number, currentIndent: string): string[] {
-		const parents: string[] = [];
+	private findParentTasks(lines: string[], currentLineNum: number, currentIndent: string): { line: string, lineNumber: number }[] {
+		const parents: { line: string, lineNumber: number }[] = [];
 		const todoPattern = /^[\t ]*- \[[ x/]\] /;
 		
 		// 从当前行向上查找所有父任务
@@ -466,7 +475,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			const indent = line.match(/^[\t ]*/)?.[0] || '';
 			// 如果找到缩进更少的任务行，说明是父任务
 			if (indent.length < currentIndent.length) {
-				parents.unshift(line); // 添加到数组开头，保持层级顺序
+				parents.unshift({ line, lineNumber: i+1 }); // 添加到数组开头，保持层级顺序
 				currentIndent = indent; // 更新当前缩进，继续查找更上层的父任务
 			}
 		}
