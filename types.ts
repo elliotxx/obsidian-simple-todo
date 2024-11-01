@@ -13,4 +13,5 @@ export interface TodoItem {
 export interface DiffResult {
 	oldContent: string;
 	newContent: string;
+	newCursorLine?: number;
 }

@@ -135,7 +135,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 
 		// 创建预览内容
-		const previewContent = await this.createPreviewContent(
+		const { content: previewContent, newCursorLine } = await this.createPreviewContent(
 			fileContent,
 			unfinishedTodoLineNumbers,
 			unfinishedTodos,
@@ -145,7 +145,8 @@ export default class SimpleTodoPlugin extends Plugin {
 
 		return {
 			oldContent: fileContent,
-			newContent: previewContent
+			newContent: previewContent,
+			newCursorLine
 		};
 	}
 
@@ -156,7 +157,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		unfinishedTodos: string[],
 		today: string,
 		cursor: EditorPosition
-	): Promise<string> {
+	): Promise<{ content: string; newCursorLine: number }> {
 		const lines = originalContent.split('\n');
 		const previewLines = [...lines];
 		
@@ -299,7 +300,32 @@ export default class SimpleTodoPlugin extends Plugin {
 			}
 		}
 
-		return result.join('\n');
+		// 在返回结果前，找到今天日期块的最后一行
+		const resultLines = result.join('\n').split('\n');
+		const todayPattern = new RegExp(`^${today}`);
+		let newCursorLine = 0;
+		
+		for (let i = 0; i < resultLines.length; i++) {
+			if (todayPattern.test(resultLines[i])) {
+				// 找到今天的日期行后，继续向下查找直到下一个日期行或空行
+				for (let j = i + 1; j < resultLines.length; j++) {
+					const nextLine = resultLines[j];
+					if (nextLine.match(/^\d{4}-\d{2}-\d{2}/) || nextLine.trim() === '') {
+						newCursorLine = j - 1; // 设置为日期块的最后一行
+						break;
+					}
+					if (j === resultLines.length - 1) {
+						newCursorLine = j; // 如果到达文件末尾，设置为最后一行
+					}
+				}
+				break;
+			}
+		}
+
+		return {
+			content: resultLines.join('\n'),
+			newCursorLine
+		};
 	}
 
 	// 获取今天的任务
@@ -690,6 +716,30 @@ class TodoDiffModal extends Modal {
 		try {
 			// 将新内容写入文件
 			await this.app.vault.modify(activeFile, this.diffResult.newContent);
+			
+			// 等待一小段时间，确保编辑器已更新内容
+			await new Promise(resolve => setTimeout(resolve, 50));
+			
+			// 设置光标位置到今天日期块的最后一行
+			if (this.diffResult.newCursorLine !== undefined) {
+				const editor = activeView.editor;
+				const line = this.diffResult.newCursorLine;
+				
+				// 确保行号有效
+				if (line >= 0 && line < editor.lineCount()) {
+					editor.setCursor({
+						line: line,
+						ch: editor.getLine(line).length
+					});
+					
+					// 确保光标所在行可见
+					editor.scrollIntoView({
+						from: { line: line, ch: 0 },
+						to: { line: line, ch: editor.getLine(line).length }
+					}, true);
+				}
+			}
+			
 			new Notice('任务已重新规划');
 		} catch (error) {
 			console.error('Failed to update file:', error);
