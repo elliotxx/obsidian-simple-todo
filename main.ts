@@ -168,7 +168,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		// 模拟在光标处添加任务
 		const datePattern = new RegExp(`^${today}`);
-		const todayLineIndex = previewLines.findIndex(line => datePattern.test(line));
+		let todayLineIndex = previewLines.findIndex(line => datePattern.test(line));
 		
 		if (todayLineIndex === -1) {
 			// 如果今天的日期不存在，创建新的日期和任务
@@ -181,14 +181,29 @@ export default class SimpleTodoPlugin extends Plugin {
 				.replace('星期五', '周五')
 				.replace('星期六', '周六');
 			
-			const insertContent = `${today} ${weekday}\n${sanitizedTodos.join('\n')}`;
-			previewLines.splice(cursor.line, 0, insertContent);
+			// 确保插入位置前后有一个空行
+			let insertPosition = cursor.line;
+			let contentToInsert = '';
+
+			// 检查前一行
+			if (insertPosition > 0 && previewLines[insertPosition - 1].trim() !== '') {
+				contentToInsert += '\n';
+			}
+
+			contentToInsert += `${today} ${weekday}\n${sanitizedTodos.join('\n')}`;
+
+			// 检查后一行
+			if (insertPosition < previewLines.length && previewLines[insertPosition].trim() !== '') {
+				contentToInsert += '\n';
+			}
+
+			previewLines.splice(insertPosition, 0, contentToInsert);
 		} else {
 			// 如果今天的日期已存在，合并任务
 			const todayTasks = this.getTodayTasks(previewLines, todayLineIndex);
 			const mergedTasks = this.mergeTasks(todayTasks, sanitizedTodos);
 			
-			// 找到今天任务的结束位置
+			// 找到今天任务块的结束位置
 			let endIndex = todayLineIndex + 1;
 			for (let i = todayLineIndex + 1; i < previewLines.length; i++) {
 				const line = previewLines[i];
@@ -197,9 +212,24 @@ export default class SimpleTodoPlugin extends Plugin {
 				}
 				endIndex = i + 1;
 			}
+
+			// 确保任务块前后有一个空行
+			let insertContent = mergedTasks.join('\n');
 			
+			// 检查前一行（日期行的前一行）
+			if (todayLineIndex > 0 && previewLines[todayLineIndex - 1].trim() !== '') {
+				previewLines.splice(todayLineIndex, 0, '');
+				todayLineIndex++;
+				endIndex++;
+			}
+
+			// 检查后一行
+			if (endIndex < previewLines.length && previewLines[endIndex].trim() !== '') {
+				insertContent += '\n';
+			}
+
 			// 替换今天的所有任务
-			previewLines.splice(todayLineIndex + 1, endIndex - todayLineIndex - 1, ...mergedTasks);
+			previewLines.splice(todayLineIndex + 1, endIndex - todayLineIndex - 1, insertContent);
 		}
 		
 		// 从原位置删除任务，从后往前处理
@@ -240,29 +270,32 @@ export default class SimpleTodoPlugin extends Plugin {
 			// 如果有未完成的子任务，保持父任务为未完成状态
 		}
 
-		// 确保日期之间只有一个空行
+		// 处理整个文件的空行，确保日期块之间只有一个空行
 		const result: string[] = [];
 		let lastLineWasDate = false;
-		let emptyLineCount = 0;
+		let lastLineWasEmpty = false;
 
 		for (let i = 0; i < previewLines.length; i++) {
 			const line = previewLines[i];
 			const isDate = line.match(/^\d{4}-\d{2}-\d{2}/);
 			const isEmpty = line.trim() === '';
+			const isTask = line.match(/^[\t ]*- \[[ x/]\]/);
 
 			if (isEmpty) {
-				if (lastLineWasDate) {
-					if (emptyLineCount === 0) {
-						result.push(line);
-						emptyLineCount++;
-					}
-				} else {
+				// 如果上一行是日期或任务，并且还没有添加过空行，则添加一个空行
+				if ((lastLineWasDate || isTask) && !lastLineWasEmpty) {
 					result.push(line);
+					lastLineWasEmpty = true;
 				}
+				// 否则跳过多余的空行
 			} else {
+				if (isDate && !lastLineWasEmpty && result.length > 0) {
+					// 如果是日期行，并且前面没有空行，添加一个空行
+					result.push('');
+				}
 				result.push(line);
 				lastLineWasDate = isDate !== null;
-				emptyLineCount = 0;
+				lastLineWasEmpty = false;
 			}
 		}
 
