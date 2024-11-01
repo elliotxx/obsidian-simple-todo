@@ -197,9 +197,36 @@ export default class SimpleTodoPlugin extends Plugin {
 			previewLines.splice(todayLineIndex + 1, endIndex - todayLineIndex - 1, ...mergedTasks);
 		}
 		
-		// 从原位置删除任务
+		// 从原位置删除任务，从后往前处理
 		for (let i = unfinishedTodoLineNumbers.length - 1; i >= 0; i--) {
-			previewLines.splice(unfinishedTodoLineNumbers[i], 1);
+			const lineNum = unfinishedTodoLineNumbers[i];
+			const line = previewLines[lineNum];
+			const indent = line.match(/^[\t ]*/)?.[0] || '';
+			
+			// 检查是否有已完成的子任务
+			let hasCompletedChildren = false;
+			for (let j = lineNum + 1; j < previewLines.length; j++) {
+				const childLine = previewLines[j];
+				const childMatch = childLine.match(/^([\t ]*)-\s*\[(x)\]/);
+				if (!childMatch) continue;
+				
+				const childIndent = childMatch[1];
+				// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
+				if (childIndent.length <= indent.length) {
+					break;
+				}
+				
+				// 找到已完成的子任务
+				if (childMatch[2] === 'x') {
+					hasCompletedChildren = true;
+					break;
+				}
+			}
+			
+			// 只有在没有已完成子任务的情况下才删除
+			if (!hasCompletedChildren) {
+				previewLines.splice(lineNum, 1);
+			}
 		}
 		
 		return previewLines.join('\n');
