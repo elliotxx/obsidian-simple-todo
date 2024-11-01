@@ -157,9 +157,14 @@ export default class SimpleTodoPlugin extends Plugin {
 		today: string,
 		cursor: EditorPosition
 	): Promise<string> {
-		// 创建内容副本
 		const lines = originalContent.split('\n');
 		const previewLines = [...lines];
+		
+		// 确保所有要移动的任务状态都是未完成状态
+		const sanitizedTodos = unfinishedTodos.map(todo => {
+			// 将任务状态重置为未完成
+			return todo.replace(/\[(x|\/)\]/, '[ ]');
+		});
 		
 		// 模拟在光标处添加任务
 		const datePattern = new RegExp(`^${today}`);
@@ -176,12 +181,12 @@ export default class SimpleTodoPlugin extends Plugin {
 				.replace('星期五', '周五')
 				.replace('星期六', '周六');
 			
-			const insertContent = `${today} ${weekday}\n${unfinishedTodos.join('\n')}`;
+			const insertContent = `${today} ${weekday}\n${sanitizedTodos.join('\n')}`;
 			previewLines.splice(cursor.line, 0, insertContent);
 		} else {
 			// 如果今天的日期已存在，合并任务
 			const todayTasks = this.getTodayTasks(previewLines, todayLineIndex);
-			const mergedTasks = this.mergeTasks(todayTasks, unfinishedTodos);
+			const mergedTasks = this.mergeTasks(todayTasks, sanitizedTodos);
 			
 			// 找到今天任务的结束位置
 			let endIndex = todayLineIndex + 1;
@@ -205,9 +210,10 @@ export default class SimpleTodoPlugin extends Plugin {
 			
 			// 检查是否有已完成的子任务
 			let hasCompletedChildren = false;
+			let hasUnfinishedChildren = false;
 			for (let j = lineNum + 1; j < previewLines.length; j++) {
 				const childLine = previewLines[j];
-				const childMatch = childLine.match(/^([\t ]*)-\s*\[(x)\]/);
+				const childMatch = childLine.match(/^([\t ]*)-\s*\[([x ])\]/);
 				if (!childMatch) continue;
 				
 				const childIndent = childMatch[1];
@@ -216,20 +222,22 @@ export default class SimpleTodoPlugin extends Plugin {
 					break;
 				}
 				
-				// 找到已完成的子任务
+				// 检查子任务状态
 				if (childMatch[2] === 'x') {
 					hasCompletedChildren = true;
-					break;
+				} else {
+					hasUnfinishedChildren = true;
 				}
 			}
 			
-			if (hasCompletedChildren) {
-				// 如果有已完成的子任务，将父任务标记为已完成
+			if (hasCompletedChildren && !hasUnfinishedChildren) {
+				// 如果所有子任务都已完成，将父任务标记为已完成
 				previewLines[lineNum] = previewLines[lineNum].replace(/\[ \]/, '[x]');
-			} else {
-				// 如果没有已完成的子任务，删除该任务
+			} else if (!hasCompletedChildren && !hasUnfinishedChildren) {
+				// 如果没有子任务，删除该任务
 				previewLines.splice(lineNum, 1);
 			}
+			// 如果有未完成的子任务，保持父任务为未完成状态
 		}
 
 		// 确保日期之间只有一个空行
