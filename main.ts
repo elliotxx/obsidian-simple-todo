@@ -123,7 +123,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
-		const { previousDate, unfinishedTodos, unfinishedTodoLineNumbers } = this.findLatestUnfinishedTodos(lines, today);
+		const { previousDate, unfinishedTodos, unfinishedTodoLineNumbers } = this.findLatestUnfinishedTodos(lines, today, cursor.line);
 		console.log('Previous date:', previousDate);
 		console.log('Unfinished todos:', unfinishedTodos);
 		console.log('Unfinished todos line numbers:', unfinishedTodoLineNumbers);
@@ -356,7 +356,11 @@ export default class SimpleTodoPlugin extends Plugin {
 	}
 
 	// 辅助方法：查找最近的未完成任务（包括父任务）
-	private findLatestUnfinishedTodos(lines: string[], today: string): { 
+	private findLatestUnfinishedTodos(
+		lines: string[], 
+		today: string,
+		startLine: number
+	): { 
 		previousDate: string | null, 
 		unfinishedTodos: string[],
 		unfinishedTodoLineNumbers: number[]
@@ -380,7 +384,8 @@ export default class SimpleTodoPlugin extends Plugin {
 		}
 		const taskInfos: TaskInfo[] = [];
 
-		for (let i = 0; i < lines.length; i++) {
+		// 从光标位置开始向后开始处理任务
+		for (let i = startLine; i < lines.length; i++) {
 			const line = lines[i];
 			// 检查是否是日期行
 			const dateMatch = line.match(datePattern);
@@ -395,9 +400,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				}
 			}
 
-			// 如果有当前日期，并且找到了未完成的任务
 			if (currentDate && todoPattern.test(line)) {
-				// 检查是否叶子任务
 				if (this.isLeafTask(lines, i)) {
 					const currentIndent = line.match(/^[\t ]*/)?.[0] || '';
 					const parents = this.findParentTasks(lines, i, currentIndent);
@@ -415,8 +418,6 @@ export default class SimpleTodoPlugin extends Plugin {
 				}
 			}
 		}
-
-		console.log("taskInfos", taskInfos)
 
 		// 处理收集到的任务信息
 		for (const taskInfo of taskInfos) {
