@@ -223,8 +223,11 @@ export default class SimpleTodoPlugin extends Plugin {
 				}
 			}
 			
-			// 只有在没有已完成子任务的情况下才删除
-			if (!hasCompletedChildren) {
+			if (hasCompletedChildren) {
+				// 如果有已完成的子任务，将父任务标记为已完成
+				previewLines[lineNum] = previewLines[lineNum].replace(/\[ \]/, '[x]');
+			} else {
+				// 如果没有已完成的子任务，删除该任务
 				previewLines.splice(lineNum, 1);
 			}
 		}
