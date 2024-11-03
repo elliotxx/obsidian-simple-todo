@@ -1,4 +1,5 @@
-import { App, Plugin, TFile, Notice, moment, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
+import { App, Plugin, TFile, Notice, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
+import moment from 'moment';
 import { TodoItem, TodoStatus, DiffResult } from './types';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';

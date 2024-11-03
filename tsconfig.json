@@ -15,10 +15,15 @@
       "DOM",
       "ES5",
       "ES6",
-      "ES7"
-    ]
+      "ES7",
+      "ES2021"
+    ],
+    "jsx": "react",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
   },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "**/*.tsx"
   ]
 }
