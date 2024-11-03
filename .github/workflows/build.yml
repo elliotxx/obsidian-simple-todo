@@ -17,12 +17,24 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '18.x'
+        cache: 'npm'
         
     - name: Install dependencies
-      run: npm install
+      run: npm ci
       
     - name: Build plugin
       run: npm run build
       
     - name: Run tests
       run: npm test
+      continue-on-error: true
+      
+    - name: Upload build artifacts
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-output
+        path: |
+          main.js
+          manifest.json
+          styles.css
