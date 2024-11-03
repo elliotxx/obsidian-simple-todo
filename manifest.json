@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-simple-todo",
 	"name": "Simple Todo",
-	"version": "1.0.0",
+	"version": "0.1.4",
 	"minAppVersion": "0.15.0",
 	"description": "一个极简的、基于文本的 Todo 管理器，支持任务状态切换、重新规划和归档功能",
 	"author": "elliotxx",
