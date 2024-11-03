@@ -1,4 +1,4 @@
-name: Build Obsidian plugin
+name: Build Obsidian Plugin
 
 on:
   push:
