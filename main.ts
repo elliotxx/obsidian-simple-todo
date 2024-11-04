@@ -1,17 +1,27 @@
 import { App, Plugin, TFile, Notice, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
 import moment from 'moment';
-import { TodoItem, TodoStatus, DiffResult } from './types';
+import { DiffResult } from './types';
+import { I18n } from './i18n';
+import { SimpleTodoSettings, DEFAULT_SETTINGS, SimpleTodoSettingTab } from './settings';
 import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { TodoDiffViewer } from './components/TodoDiffViewer';
 
 export default class SimpleTodoPlugin extends Plugin {
+	settings: SimpleTodoSettings;
+	i18n: I18n;
+
 	async onload() {
-		console.log('Loading Simple Todo plugin...');
+		await this.loadSettings();
+		this.i18n = new I18n(this.settings.language);
+
+		// 添加设置面板
+		this.addSettingTab(new SimpleTodoSettingTab(this.app, this));
+
 		// 注册插件命令
 		this.addCommand({
 			id: 'toggle-todo-status',
-			name: 'Toggle Todo Status',
+			name: this.i18n.t('commands.toggleTodo.name'),
 			hotkeys: [{ modifiers: ["Mod"], key: "Enter" }],
 			editorCallback: (editor: Editor) => {
 				this.toggleTodoStatus();
@@ -20,7 +30,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'reschedule-previous-todos',
-			name: 'Reschedule Previous Day Todos',
+			name: this.i18n.t('commands.rescheduleTodos.name'),
 			callback: async () => {
 				const diffResult = await this.reschedulePreviousTodos();
 				if (diffResult) {
@@ -33,9 +43,17 @@ export default class SimpleTodoPlugin extends Plugin {
 
 		this.addCommand({
 			id: 'archive-completed-todos',
-			name: 'Archive Completed Todos',
+			name: this.i18n.t('commands.archiveTodos.name'),
 			callback: () => this.archiveCompletedTodos()
 		});
+	}
+
+	async loadSettings() {
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+	}
+
+	async saveSettings() {
+		await this.saveData(this.settings);
 	}
 
 	// 切换任务状态
@@ -76,7 +94,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				}]
 			});
 
-			new Notice(`任务状态已更改: ${this.getStatusText(currentStatus)} -> ${this.getStatusText(newStatus)}`);
+			new Notice(this.i18n.t('commands.toggleTodo.notice', { from: this.getStatusText(currentStatus), to: this.getStatusText(newStatus) }));
 		} else {
 			console.log('No todo item found at current line');
 		}
@@ -131,7 +149,7 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
 			console.log('No unfinished todos found from previous dates');
-			new Notice('没有找到未完成的任务');
+			new Notice(this.i18n.t('commands.rescheduleTodos.notice.noTasks'));
 			return null;
 		}
 
@@ -174,14 +192,8 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		if (todayLineIndex === -1) {
 			// 如果今天的日期不存在，创建新的日期和任务
-			const weekday = moment(today).format('dddd')
-				.replace('星期日', '周日')
-				.replace('星期一', '周一')
-				.replace('星期二', '周二')
-				.replace('星期三', '周三')
-				.replace('星期四', '周四')
-				.replace('星期五', '周五')
-				.replace('星期六', '周六');
+			const weekday = moment(today).format('dddd');
+			const localizedWeekday = this.getWeekdayText(weekday);
 			
 			// 确保插入位置前后有一个空行
 			let insertPosition = cursor.line;
@@ -192,7 +204,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				contentToInsert += '\n';
 			}
 
-			contentToInsert += `${today} ${weekday}\n${sanitizedTodos.join('\n')}`;
+			contentToInsert += `${today} ${localizedWeekday}\n${sanitizedTodos.join('\n')}`;
 
 			// 检查后一行
 			if (insertPosition < previewLines.length && previewLines[insertPosition].trim() !== '') {
@@ -566,7 +578,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			const hasUnfinishedTasks = tasks.some(task => task.match(/^- \[[ /]\] /));
 			if (hasUnfinishedTasks) {
 				console.log(`${month} has unfinished tasks, skipping...`);
-				new Notice(`${month} 还有未完成的任务，无法归档该月份的任务`);
+				new Notice(this.i18n.t('commands.archiveTodos.notice.hasUnfinished', { month }));
 				continue;
 			}
 
@@ -672,6 +684,64 @@ export default class SimpleTodoPlugin extends Plugin {
 		const lines = content.split('\n');
 		const archivedTasksSet = new Set(archivedTasks);
 		return lines.filter(line => !archivedTasksSet.has(line)).join('\n');
+	}
+
+	private getWeekdayText(weekday: string): string {
+		const weekdayMap: Record<string, string> = {
+			'Sunday': 'weekday.sunday',
+			'Monday': 'weekday.monday',
+			'Tuesday': 'weekday.tuesday',
+			'Wednesday': 'weekday.wednesday',
+			'Thursday': 'weekday.thursday',
+			'Friday': 'weekday.friday',
+			'Saturday': 'weekday.saturday'
+		};
+		
+		return this.i18n.t(weekdayMap[weekday] || 'weekday.sunday');
+	}
+
+	// 添加重新加载命令的方法
+	reloadCommands() {
+		// 清除并重新注册命令
+		const commandIds = [
+			`${this.manifest.id}:toggle-todo-status`,
+			`${this.manifest.id}:reschedule-previous-todos`,
+			`${this.manifest.id}:archive-completed-todos`
+		];
+
+		// 移除现有命令
+		commandIds.forEach(id => {
+			// @ts-ignore
+			this.app.commands?.removeCommand(id);
+		});
+
+		// 重新注册命令
+		this.addCommand({
+			id: 'toggle-todo-status',
+			name: this.i18n.t('commands.toggleTodo.name'),
+			hotkeys: [{ modifiers: ["Mod"], key: "Enter" }],
+			editorCallback: (editor: Editor) => {
+				this.toggleTodoStatus();
+			}
+		});
+
+		this.addCommand({
+			id: 'reschedule-previous-todos',
+			name: this.i18n.t('commands.rescheduleTodos.name'),
+			callback: async () => {
+				const diffResult = await this.reschedulePreviousTodos();
+				if (diffResult) {
+					const modal = new TodoDiffModal(this.app, diffResult);
+					modal.open();
+				}
+			}
+		});
+
+		this.addCommand({
+			id: 'archive-completed-todos',
+			name: this.i18n.t('commands.archiveTodos.name'),
+			callback: () => this.archiveCompletedTodos()
+		});
 	}
 }
 
