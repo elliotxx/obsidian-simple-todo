@@ -1,9 +1,9 @@
 {
 	"id": "obsidian-simple-todo",
 	"name": "Simple Todo",
-	"version": "0.1.11",
+	"version": "0.1.12",
 	"minAppVersion": "0.15.0",
-	"description": "一个极简的、基于文本的 Todo 管理器，支持任务状态切换、重新规划和归档功能",
+	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management in Obsidian.",
 	"author": "elliotxx",
 	"authorUrl": "https://github.com/elliotxx",
 	"isDesktopOnly": false
