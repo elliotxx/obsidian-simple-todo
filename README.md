@@ -12,6 +12,8 @@ English | [简体中文](./README.zh-CN.md)
 - 📅 Date-based task organization
 - 🔄 Task status toggle (Todo/In Progress/Done)
 - 📦 Completed task archiving
+- 🌐 Multi-language support (English, 简体中文)
+- ⌨️ Customizable keyboard shortcuts
 
 ## Installation
 
@@ -21,6 +23,18 @@ English | [简体中文](./README.zh-CN.md)
 4. Click "Browse" and search for "Simple Todo"
 5. Click Install
 6. Enable the plugin
+
+## Settings
+
+### Language
+- Open plugin settings
+- Select your preferred language from the dropdown menu
+- Changes take effect immediately
+
+### Keyboard Shortcuts
+Default shortcuts:
+- `Ctrl/Cmd + Enter` - Toggle todo status
+- Other commands can be configured in plugin settings
 
 ## Usage
 
