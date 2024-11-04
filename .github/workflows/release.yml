@@ -49,60 +49,30 @@ jobs:
           echo "## What's Changed" > CHANGELOG.md
           echo "" >> CHANGELOG.md
 
-          # Features
-          echo "### ✨ Features" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^feat" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
+          # Function to append section if it has content
+          append_section() {
+            local title=$1
+            local grep_pattern=$2
+            local content=$(git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="$grep_pattern")
+            if [ ! -z "$content" ]; then
+              echo "$title" >> CHANGELOG.md
+              echo "$content" >> CHANGELOG.md
+              echo "" >> CHANGELOG.md
+            fi
+          }
 
-          # Bug Fixes
-          echo "### 🐛 Bug Fixes" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^fix" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Documentation
-          echo "### 📝 Documentation" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^docs" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Styles
-          echo "### 💄 Styles" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^style" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Refactor
-          echo "### ♻️ Refactor" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^refactor" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Performance
-          echo "### ⚡️ Performance" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^perf" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Chore
-          echo "### 🔧 Chore" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^chore" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Build
-          echo "### 📦 Build" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^build" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # CI
-          echo "### 👷 CI" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^ci" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Dependencies
-          echo "### ⬆️ Dependencies" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^deps" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
-
-          # Revert
-          echo "### ⏪ Revert" >> CHANGELOG.md
-          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^revert" >> CHANGELOG.md
-          echo "" >> CHANGELOG.md
+          # Add sections only if they have content
+          append_section "### ✨ Features" "^feat"
+          append_section "### 🐛 Bug Fixes" "^fix"
+          append_section "### 📝 Documentation" "^docs"
+          append_section "### 💄 Styles" "^style"
+          append_section "### ♻️ Refactor" "^refactor"
+          append_section "### ⚡️ Performance" "^perf"
+          append_section "### 🔧 Chore" "^chore"
+          append_section "### 📦 Build" "^build"
+          append_section "### 👷 CI" "^ci"
+          append_section "### ⬆️ Dependencies" "^deps"
+          append_section "### ⏪ Revert" "^revert"
 
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}" >> CHANGELOG.md
       
