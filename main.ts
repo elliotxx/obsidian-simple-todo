@@ -114,10 +114,10 @@ export default class SimpleTodoPlugin extends Plugin {
 	// 获取状态文本说明
 	private getStatusText(status: string): string {
 		switch (status) {
-			case ' ': return '待办';
-			case '/': return '进行中';
-			case 'x': return '已完成';
-			default: return '未知状态';
+			case ' ': return this.i18n.t('status.todo');
+			case '/': return this.i18n.t('status.inProgress');
+			case 'x': return this.i18n.t('status.done');
+			default: return this.i18n.t('status.unknown');
 		}
 	}
 
@@ -261,7 +261,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				if (!childMatch) continue;
 				
 				const childIndent = childMatch[1];
-				// 如果遇到缩进更少或相等的行，说明已经超出了子任务范围
+				// 如果遇到缩进更少或相等的行，说明已经���出了子任务范围
 				if (childIndent.length <= indent.length) {
 					break;
 				}
@@ -702,7 +702,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	// 添加重新加载命令的方法
 	reloadCommands() {
-		// 清除并重新注册命令
+		// 清除并重新注册命��
 		const commandIds = [
 			`${this.manifest.id}:toggle-todo-status`,
 			`${this.manifest.id}:reschedule-previous-todos`,

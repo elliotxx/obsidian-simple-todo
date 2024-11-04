@@ -13,7 +13,6 @@ English | [简体中文](./README.zh-CN.md)
 - 🔄 Task status toggle (Todo/In Progress/Done)
 - 📦 Completed task archiving
 - 🌐 Multi-language support (English, 简体中文)
-- ⌨️ Customizable keyboard shortcuts
 
 ## Installation
 
