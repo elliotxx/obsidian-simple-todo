@@ -1,5 +1,5 @@
 {
-	"name": "obsidian-simple-todo",
+	"name": "simple-todo",
 	"version": "1.0.0",
 	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management in Obsidian.",
 	"main": "main.js",
