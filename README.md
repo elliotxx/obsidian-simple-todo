@@ -4,6 +4,8 @@ A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task 
 
 English | [简体中文](./README.zh-CN.md)
 
+![demo](./assets/demo.gif)
+
 ## Features
 
 - 📝 Pure text-based, fully compatible with Markdown syntax
