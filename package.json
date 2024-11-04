@@ -1,7 +1,7 @@
 {
 	"name": "obsidian-simple-todo",
 	"version": "1.0.0",
-	"description": "一个极简的、基于文本的 Todo 管理器，支持任务状态切换、重新规划和归档功能",
+	"description": "A minimalist text-based todo manager for efficient task management in Obsidian.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",

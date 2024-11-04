@@ -1,136 +1,138 @@
 # Obsidian Simple Todo
 
-一个极简的、基于文本的 Todo 管理器（Text-Based GTD）插件，帮助你在 Obsidian 中高效管理任务。
+A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management in Obsidian.
 
-## 功能特点
+English | [简体中文](./README.zh-CN.md)
 
-- 📝 基于纯文本，完全符合 Markdown 语法
-- 🎯 支持快速添加、编辑和完成任务
-- 🗂 简单的任务分类管理
-- 📅 支持按日期组织任务
-- 🔄 支持任务状态切换（待办/进行中/已完成）
-- 📦 支持归档已完成任务
+## Features
 
-## 安装方法
+- 📝 Pure text-based, fully compatible with Markdown syntax
+- 🎯 Quick task creation, editing, and completion
+- 🗂 Simple task categorization
+- 📅 Date-based task organization
+- 🔄 Task status toggle (Todo/In Progress/Done)
+- 📦 Completed task archiving
 
-1. 在 Obsidian 中打开设置
-2. 进入 "第三方插件"
-3. 关闭 "安全模式"
-4. 点击 "浏览" 并搜索 "Simple Todo"
-5. 点击安装
-6. 启用插件
+## Installation
 
-## 使用方法
+1. Open Settings in Obsidian
+2. Go to "Community Plugins"
+3. Disable "Safe Mode"
+4. Click "Browse" and search for "Simple Todo"
+5. Click Install
+6. Enable the plugin
 
-### 基本语法
+## Usage
+
+### Basic Syntax
 
 ```
-2024-10-30 周三  
-- [ ] 创建待办任务  
-- [x] 标记任务为已完成  
-- [/] 标记任务为进行中  
+2024-10-30 Wed  
+- [ ] Create a todo task  
+- [x] Mark task as completed  
+- [/] Mark task as in progress  
 ```
 
-注意：
-- 日期和时间格式必须为 `2024-10-30 周三`，否则无法识别
-- 任务前必须添加 `- [ ]` 或 `- [x]` 或 `- [/]` 才能被识别为任务
+Note:
+- Date format must be `2024-10-30 Wed` to be recognized
+- Tasks must start with `- [ ]` or `- [x]` or `- [/]` to be recognized as tasks
 
-### 支持的命令
-- `Toggle Todo Status` - 切换任务状态（待办 -> 进行中 -> 已完成 -> 待办）
-- `Reschedule Previous Todos` - 重新规划未完成任务（将最近一天的未完成任务移动到今天）
-- `Archive Completed Todos` - 归档已完成任务（按月份归档到 simple-todo 目录）
+### Supported Commands
+- `Toggle Todo Status` - Toggle task status (Todo -> In Progress -> Done -> Todo)
+- `Reschedule Previous Todos` - Move unfinished tasks from the most recent day to today
+- `Archive Completed Todos` - Archive completed tasks (by month to simple-todo directory)
 
-### 任务状态说明
-- `- [ ]` - 待办任务
-- `- [/]` - 进行中的任务
-- `- [x]` - 已完成的任务
+### Task Status
+- `- [ ]` - Todo task
+- `- [/]` - Task in progress
+- `- [x]` - Completed task
 
-### 重新规划任务
-- 插件会从光标位置开始，向后查找最近的一天中的未完成任务
-- 如果找到未完成任务，会将它们移动到今天的日期下
-- 如果今天的日期不存在，会自动创建今天的日期并添加任务
-- 重新规划完成后，光标会自动定位到今天日期块的最后一个任务，方便继续编辑
+### Task Rescheduling
+- Plugin searches for unfinished tasks from the most recent day, starting from cursor position
+- If unfinished tasks are found, they will be moved under today's date
+- If today's date doesn't exist, it will be created automatically
+- After rescheduling, cursor will be positioned at the last task of today's block
 
-### 归档功能
-- 归档文件统一存放在 `simple-todo/` 目录下
-- 归档文件按月份自动命名（例如：`simple-todo/archive-2024-03.md`）
-- 归档规则：
-  - 按月份对任务进行分组
-  - 只有当某个月份的所有任务都已完成时，才能归档该月份的任务
-  - 如果月份中还存在未完成或进行中的任务，将跳过该月份并显示提示
-- 归档文件格式：
-  - 每个归档文件包含月份标题
-  - 按时间顺序记录已完成的任务
-  - 原文件中的已归档任务会被自动删除
+### Archiving
+- Archive files are stored in the `simple-todo/` directory
+- Files are named by month (e.g., `simple-todo/archive-2024-03.md`)
+- Archiving rules:
+  - Tasks are grouped by month
+  - A month can only be archived when all its tasks are completed
+  - Months with unfinished or in-progress tasks will be skipped with a notification
+- Archive file format:
+  - Each file includes a month title
+  - Completed tasks are recorded chronologically
+  - Archived tasks are automatically removed from the original file
 
-### 任务日期格式
-- 日期格式：`YYYY-MM-DD 星期`
-- 示例：`2024-03-21 周四`
-- 日期行必须独占一行
-- 任务必须在日期行之后
-- 日期块之间建议保留一个空行，插件会自动处理空行
+### Date Format
+- Format: `YYYY-MM-DD Weekday`
+- Example: `2024-03-21 Thu`
+- Date line must be on its own line
+- Tasks must follow the date line
+- Recommended to keep one empty line between date blocks, plugin will handle spacing automatically
 
-## 本地开发指南
+## Development Guide
 
-### 环境准备
+### Prerequisites
 
-1. 安装 Node.js (推荐使用 LTS 版本)
-2. 安装 npm
-3. 克隆项目到本地：
+1. Install Node.js (LTS version recommended)
+2. Install npm
+3. Clone the repository:
 ```bash
 git clone https://github.com/elliotxx/obsidian-simple-todo.git
 ```
 
-### 开发工作流
+### Development Workflow
 
-1. 安装依赖：
+1. Install dependencies:
 ```bash
 cd obsidian-simple-todo
 npm install
 ```
 
-2. 创建软链接到测试 vault：
+2. Create symlink to test vault:
 ```bash
-# Windows (管理员权限)
+# Windows (Administrator)
 mklink /D "path/to/vault/.obsidian/plugins/obsidian-simple-todo" "path/to/your/project"
 
 # macOS/Linux
 ln -s "path/to/your/project" "path/to/vault/.obsidian/plugins/obsidian-simple-todo"
 ```
 
-3. 启动开发服务器：
+3. Start development server:
 ```bash
 npm run dev
 ```
 
-4. 在 Obsidian 中：
-   - 打开设置 > 第三方插件
-   - 关闭安全模式
-   - 刷新已安装插件列表
-   - 启用 "Simple Todo" 插件
+4. In Obsidian:
+   - Open Settings > Community Plugins
+   - Turn off Safe Mode
+   - Refresh plugin list
+   - Enable "Simple Todo" plugin
 
-5. 修改代码后：
-   - 保存文件会自动重新构建
-   - 在 Obsidian 中按 `Ctrl/Cmd + R` 重新加载
+5. After code changes:
+   - Files will auto-rebuild on save
+   - Press `Ctrl/Cmd + R` in Obsidian to reload
 
-### 构建发布
+### Building for Release
 
-1. 构建生产版本：
+1. Build production version:
 ```bash
 npm run build
 ```
 
-2. 发布前检查清单：
-   - 更新 `manifest.json` 中的版本号
-   - 更新 `package.json` 中的版本号
-   - 更新 `versions.json`
-   - 提交所有更改
-   - 创建新的 release tag
+2. Pre-release checklist:
+   - Update version in `manifest.json`
+   - Update version in `package.json`
+   - Update `versions.json`
+   - Commit all changes
+   - Create new release tag
 
-## 贡献
+## Contributing
 
-欢迎提交 Issues 和 Pull Requests！
+Issues and Pull Requests are welcome!
 
-## 许可证
+## License
 
 MIT License
