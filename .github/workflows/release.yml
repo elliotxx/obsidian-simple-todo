@@ -42,81 +42,77 @@ jobs:
         run: |
           PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
           echo "tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Features
+          echo "### ✨ Features" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^feat" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Bug Fixes
+          echo "### 🐛 Bug Fixes" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^fix" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Documentation
+          echo "### 📝 Documentation" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^docs" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Styles
+          echo "### 💄 Styles" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^style" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Refactor
+          echo "### ♻️ Refactor" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^refactor" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Performance
+          echo "### ⚡️ Performance" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^perf" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Chore
+          echo "### 🔧 Chore" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^chore" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Build
+          echo "### 📦 Build" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^build" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # CI
+          echo "### 👷 CI" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^ci" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Dependencies
+          echo "### ⬆️ Dependencies" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^deps" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          # Revert
+          echo "### ⏪ Revert" >> CHANGELOG.md
+          git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s" --grep="^revert" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}" >> CHANGELOG.md
       
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: CHANGELOG.md
           fail_on_unmatched_files: true
           files: |
             main.js
             manifest.json
             styles.css
-          notes_header: |
-            ## What's Changed
-          notes_footer: |
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}
-          categories: |
-            [
-              {
-                "title": "## ✨ Features",
-                "labels": ["feature"],
-                "commits": ["^feat"]
-              },
-              {
-                "title": "## 🐛 Bug Fixes",
-                "labels": ["fix"],
-                "commits": ["^fix"]
-              },
-              {
-                "title": "## 📝 Documentation",
-                "labels": ["docs"],
-                "commits": ["^docs"]
-              },
-              {
-                "title": "## 💄 Styles",
-                "labels": ["style"],
-                "commits": ["^style"]
-              },
-              {
-                "title": "## ♻️ Refactor",
-                "labels": ["refactor"],
-                "commits": ["^refactor"]
-              },
-              {
-                "title": "## ⚡️ Performance",
-                "labels": ["perf"],
-                "commits": ["^perf"]
-              },
-              {
-                "title": "## ✅ Tests",
-                "labels": ["test"],
-                "commits": ["^test"]
-              },
-              {
-                "title": "## 🔧 Chore",
-                "labels": ["chore"],
-                "commits": ["^chore"]
-              },
-              {
-                "title": "## 📦 Build",
-                "labels": ["build"],
-                "commits": ["^build"]
-              },
-              {
-                "title": "## 👷 CI",
-                "labels": ["ci"],
-                "commits": ["^ci"]
-              },
-              {
-                "title": "## ⬆️ Dependencies",
-                "labels": ["deps"],
-                "commits": ["^deps"]
-              },
-              {
-                "title": "## ⏪ Revert",
-                "labels": ["revert"],
-                "commits": ["^revert"]
-              }
-            ]
