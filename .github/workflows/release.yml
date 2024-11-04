@@ -5,55 +5,43 @@ on:
     tags:
       - "*"
 
+permissions:
+  contents: write
+  discussions: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18.x'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: 'npm'
         
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
       
-    - name: Build plugin
-      run: npm run build
+      - name: Build plugin
+        run: npm run build
       
-    - name: Verify build output
-      run: |
-        if [ ! -f main.js ] || [ ! -f manifest.json ]; then
-          echo "Build output is missing required files"
-          exit 1
-        fi
+      - name: Verify build output
+        run: |
+          if [ ! -f main.js ] || [ ! -f manifest.json ]; then
+            echo "Build output is missing required files"
+            exit 1
+          fi
       
-    - name: Get version from tag
-      id: get_version
-      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-      
-    - name: Generate release notes
-      id: generate_notes
-      uses: softprops/action-gh-release@v1
-      with:
-        draft: false
-        generate_release_notes: true
-        
-    - name: Create Release
-      id: create_release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ env.VERSION }}
-        name: ${{ env.VERSION }}
-        body: ${{ steps.generate_notes.outputs.body }}
-        draft: false
-        prerelease: false
-        files: |
-          main.js
-          manifest.json
-          styles.css 
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            main.js
+            manifest.json
+            styles.css 
