@@ -53,7 +53,6 @@ jobs:
             main.js
             manifest.json
             styles.css
-          body_path: ${{ github.workspace }}-CHANGELOG.txt
           notes_header: |
             ## What's Changed
           notes_footer: |
