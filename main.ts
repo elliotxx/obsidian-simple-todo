@@ -35,7 +35,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				const diffResult = await this.reschedulePreviousTodos();
 				if (diffResult) {
 					// 创建一个新的 modal 来显示 diff
-					const modal = new TodoDiffModal(this.app, diffResult);
+					const modal = new TodoDiffModal(this.app, diffResult, this);
 					modal.open();
 				}
 			}
@@ -731,7 +731,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			callback: async () => {
 				const diffResult = await this.reschedulePreviousTodos();
 				if (diffResult) {
-					const modal = new TodoDiffModal(this.app, diffResult);
+					const modal = new TodoDiffModal(this.app, diffResult, this);
 					modal.open();
 				}
 			}
@@ -747,7 +747,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 // 创建一个 Modal 类来显示 diff
 class TodoDiffModal extends Modal {
-	constructor(app: App, private diffResult: DiffResult) {
+	constructor(app: App, private diffResult: DiffResult, private plugin: SimpleTodoPlugin) {
 		super(app);
 	}
 
@@ -756,13 +756,12 @@ class TodoDiffModal extends Modal {
 		// @ts-ignore
 		ReactDOM.render(
 			React.createElement(TodoDiffViewer, {
-				diffResult: this.diffResult,
-				onClose: () => this.close(),
-				onConfirm: async () => {
-					// 执行实际的任务移动操作
-					await this.confirmChanges();
-					this.close();
-				}
+					diffResult: this.diffResult,
+					onClose: () => this.close(),
+					onConfirm: async () => {
+						await this.confirmChanges();
+						this.close();
+					}
 			}),
 			contentEl
 		);
@@ -785,25 +784,19 @@ class TodoDiffModal extends Modal {
 		}
 
 		try {
-			// 将新内容写入文件
 			await this.app.vault.modify(activeFile, this.diffResult.newContent);
-			
-			// 等待一小段时间，确保编辑器已更新内容
 			await new Promise(resolve => setTimeout(resolve, 50));
 			
-			// 设置光标位置到今天日期块的最后一行
 			if (this.diffResult.newCursorLine !== undefined) {
 				const editor = activeView.editor;
 				const line = this.diffResult.newCursorLine;
 				
-				// 确保行号有效
 				if (line >= 0 && line < editor.lineCount()) {
 					editor.setCursor({
 						line: line,
 						ch: editor.getLine(line).length
 					});
 					
-					// 确保光标所在行可见
 					editor.scrollIntoView({
 						from: { line: line, ch: 0 },
 						to: { line: line, ch: editor.getLine(line).length }
@@ -811,10 +804,10 @@ class TodoDiffModal extends Modal {
 				}
 			}
 			
-			new Notice('任务已重新规划');
+			new Notice(this.plugin.i18n.t('commands.rescheduleTodos.notice.success'));
 		} catch (error) {
 			console.error('Failed to update file:', error);
-			new Notice('更新文件失败');
+			new Notice(this.plugin.i18n.t('commands.archiveTodos.notice.updateFailed'));
 		}
 	}
 }
