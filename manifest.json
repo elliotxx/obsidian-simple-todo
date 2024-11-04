@@ -3,7 +3,7 @@
 	"name": "Simple Todo",
 	"version": "0.1.12",
 	"minAppVersion": "0.15.0",
-	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management in Obsidian.",
+	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management.",
 	"author": "elliotxx",
 	"authorUrl": "https://github.com/elliotxx",
 	"isDesktopOnly": false
