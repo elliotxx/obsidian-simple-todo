@@ -22,7 +22,6 @@ export default class SimpleTodoPlugin extends Plugin {
 		this.addCommand({
 			id: 'toggle-todo-status',
 			name: this.i18n.t('commands.toggleTodo.name'),
-			hotkeys: [{ modifiers: ["Mod"], key: "Enter" }],
 			editorCallback: (editor: Editor) => {
 				this.toggleTodoStatus();
 			}
@@ -60,7 +59,6 @@ export default class SimpleTodoPlugin extends Plugin {
 	async toggleTodoStatus() {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView) {
-			console.log('No active markdown view found');
 			return;
 		}
 
@@ -68,15 +66,12 @@ export default class SimpleTodoPlugin extends Plugin {
 		const cursor = editor.getCursor();
 		const line = editor.getLine(cursor.line);
 		
-		console.log('Current line:', line);
-
 		const todoPattern = /^([\t ]*)-\s*\[([ x/])\]\s*(.*)/;
 		const match = line.match(todoPattern);
 		
 		if (match) {
 			const [_, indent, currentStatus, content] = match;
 			const newStatus = this.getNextStatus(currentStatus);
-			console.log(`Toggling todo status: ${currentStatus} -> ${newStatus}`);
 			
 			const newLine = `${indent}- [${newStatus}] ${content}`;
 			
@@ -95,18 +90,15 @@ export default class SimpleTodoPlugin extends Plugin {
 			});
 
 			new Notice(this.i18n.t('commands.toggleTodo.notice', { from: this.getStatusText(currentStatus), to: this.getStatusText(newStatus) }));
-		} else {
-			console.log('No todo item found at current line');
 		}
 	}
 
 	// 获取下一个状态
 	getNextStatus(currentStatus: string): string {
-		console.log('Current status:', currentStatus);
 		switch (currentStatus) {
-			case ' ': return '/';  // 待办 -> 进行中
-			case '/': return 'x';  // 进行中 -> 已完成
-			case 'x': return ' ';  // 已完成 -> 待办
+			case ' ': return '/';
+			case '/': return 'x';
+			case 'x': return ' ';
 			default: return ' ';
 		}
 	}
@@ -125,7 +117,6 @@ export default class SimpleTodoPlugin extends Plugin {
 	async reschedulePreviousTodos(): Promise<DiffResult | null> {
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
 		if (!activeView) {
-			console.log('No active markdown view found');
 			return null;
 		}
 
@@ -133,22 +124,16 @@ export default class SimpleTodoPlugin extends Plugin {
 		const cursor = editor.getCursor();
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
-			console.log('No active file found');
 			return null;
 		}
 
-		console.log('Starting to reschedule previous todos...');
 		const fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		const today = moment().format('YYYY-MM-DD');
 
 		const { previousDate, unfinishedTodos, unfinishedTodoLineNumbers } = this.findLatestUnfinishedTodos(lines, today, cursor.line);
-		console.log('Previous date:', previousDate);
-		console.log('Unfinished todos:', unfinishedTodos);
-		console.log('Unfinished todos line numbers:', unfinishedTodoLineNumbers);
 		
 		if (!previousDate || unfinishedTodos.length === 0) {
-			console.log('No unfinished todos found from previous dates');
 			new Notice(this.i18n.t('commands.rescheduleTodos.notice.noTasks'));
 			return null;
 		}
@@ -261,7 +246,7 @@ export default class SimpleTodoPlugin extends Plugin {
 				if (!childMatch) continue;
 				
 				const childIndent = childMatch[1];
-				// 如果遇到缩进更少或相等的行，说明已经���出了子任务范围
+				// 如果遇到缩进更少或相等的行，说明已经出了子任务范围
 				if (childIndent.length <= indent.length) {
 					break;
 				}
@@ -561,11 +546,10 @@ export default class SimpleTodoPlugin extends Plugin {
 	async archiveCompletedTodos() {
 		const activeFile = this.app.workspace.getActiveFile();
 		if (!activeFile) {
-			console.log('No active file found');
+			console.error('No active file found');
 			return;
 		}
 
-		console.log('Starting to archive completed todos...');
 		let fileContent = await this.app.vault.read(activeFile);
 		const lines = fileContent.split('\n');
 		
@@ -574,22 +558,15 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		// 检查每个月份是否可以归档
 		for (const [month, tasks] of Object.entries(tasksByMonth)) {
-			console.log(`Processing tasks for ${month}...`);
 			const hasUnfinishedTasks = tasks.some(task => task.match(/^- \[[ /]\] /));
 			if (hasUnfinishedTasks) {
-				console.log(`${month} has unfinished tasks, skipping...`);
 				new Notice(this.i18n.t('commands.archiveTodos.notice.hasUnfinished', { month }));
 				continue;
 			}
 
 			// 获取该月份的已完成任务
 			const completedTasks = tasks.filter(task => task.match(/^- \[x\] /));
-			if (completedTasks.length === 0) {
-				console.log(`No completed tasks found for ${month}`);
-				continue;
-			}
-
-			console.log(`Found ${completedTasks.length} completed tasks for ${month}`);
+			if (completedTasks.length === 0) continue;
 
 			// 确保归档目录存在
 			const archiveDirPath = 'simple-todo';
@@ -603,7 +580,6 @@ export default class SimpleTodoPlugin extends Plugin {
 			const archiveFileName = `${archiveDirPath}/archive-${month}.md`;
 			try {
 				await this.updateArchiveFile(archiveFileName, completedTasks, month);
-				console.log(`Successfully archived tasks to ${archiveFileName}`);
 			} catch (error) {
 				console.error(`Failed to update archive file: ${error}`);
 				continue;
@@ -611,13 +587,11 @@ export default class SimpleTodoPlugin extends Plugin {
 
 			// 从原文件中删除已归档的任务
 			fileContent = this.removeArchivedTasks(fileContent, completedTasks);
-			console.log(`Removed ${completedTasks.length} archived tasks from original file`);
 		}
 
 		// 更新原文件
 		try {
 			await this.app.vault.modify(activeFile, fileContent);
-			console.log('Successfully updated original file');
 		} catch (error) {
 			console.error(`Failed to update original file: ${error}`);
 			new Notice('更新原文件失败');
@@ -664,12 +638,12 @@ export default class SimpleTodoPlugin extends Plugin {
 	// 更新归档文件
 	private async updateArchiveFile(filePath: string, tasks: string[], month: string): Promise<void> {
 		try {
-			const archiveFile = this.app.vault.getAbstractFileByPath(filePath) as TFile;
+			const abstractFile = this.app.vault.getAbstractFileByPath(filePath);
 			const header = `# ${month} 已归档任务\n\n`;
 			
-			if (archiveFile) {
-				const archiveContent = await this.app.vault.read(archiveFile);
-				await this.app.vault.modify(archiveFile, archiveContent + '\n' + tasks.join('\n'));
+			if (abstractFile instanceof TFile) {
+				const archiveContent = await this.app.vault.read(abstractFile);
+				await this.app.vault.modify(abstractFile, archiveContent + '\n' + tasks.join('\n'));
 			} else {
 				await this.app.vault.create(filePath, header + tasks.join('\n'));
 			}
@@ -702,7 +676,7 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	// 添加重新加载命令的方法
 	reloadCommands() {
-		// 清除并重新注册命��
+		// 清除并重新注册命令
 		const commandIds = [
 			`${this.manifest.id}:toggle-todo-status`,
 			`${this.manifest.id}:reschedule-previous-todos`,
@@ -719,7 +693,6 @@ export default class SimpleTodoPlugin extends Plugin {
 		this.addCommand({
 			id: 'toggle-todo-status',
 			name: this.i18n.t('commands.toggleTodo.name'),
-			hotkeys: [{ modifiers: ["Mod"], key: "Enter" }],
 			editorCallback: (editor: Editor) => {
 				this.toggleTodoStatus();
 			}
