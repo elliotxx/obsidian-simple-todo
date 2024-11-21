@@ -151,6 +151,28 @@ export default class SimpleTodoPlugin extends Plugin {
 			cursor
 		);
 
+		// If preview is disabled, apply changes directly
+		if (!this.settings.showDiffPreview) {
+			await this.app.vault.modify(activeFile, previewContent);
+			
+			// Update cursor position
+			if (newCursorLine !== undefined) {
+				editor.setCursor({
+					line: newCursorLine,
+					ch: editor.getLine(newCursorLine).length
+				});
+				
+				editor.scrollIntoView({
+					from: { line: newCursorLine, ch: 0 },
+					to: { line: newCursorLine, ch: editor.getLine(newCursorLine).length }
+				}, true);
+			}
+			
+			new Notice(this.i18n.t('commands.rescheduleTodos.notice.success'));
+			return null;
+		}
+
+		// Return diff result for preview
 		return {
 			oldContent: fileContent,
 			newContent: previewContent,
@@ -575,11 +597,11 @@ export default class SimpleTodoPlugin extends Plugin {
 			const completedTasks = tasks.filter(task => task.match(/^- \[x\] /));
 			if (completedTasks.length === 0) continue;
 
-			// Ensure archive directory exists
+			// Use the configured archive path
 			const archiveDirPath = this.settings.archivePath;
 			if (!await this.ensureArchiveDirectory(archiveDirPath)) {
 				console.error('Failed to create archive directory');
-				new Notice('Failed to create archive directory');
+				new Notice(this.i18n.t('commands.archiveTodos.notice.updateFailed'));
 				return;
 			}
 
@@ -601,7 +623,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			await this.app.vault.modify(activeFile, fileContent);
 		} catch (error) {
 			console.error(`Failed to update original file: ${error}`);
-			new Notice('Failed to update original file');
+			new Notice(this.i18n.t('commands.archiveTodos.notice.updateFailed'));
 		}
 	}
 
