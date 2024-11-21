@@ -40,5 +40,14 @@ export default {
                 updateFailed: "Failed to update file"
             }
         }
+    },
+    modal: {
+        confirm: "Confirm",
+        cancel: "Cancel",
+        diffViewer: {
+            title: "Preview changes",
+            confirmHint: "Confirm (Enter)",
+            cancelHint: "Cancel (Esc)"
+        }
     }
 } 

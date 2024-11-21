@@ -736,7 +736,8 @@ class TodoDiffModal extends Modal {
 					onConfirm: async () => {
 						await this.confirmChanges();
 						this.close();
-					}
+					},
+					i18n: this.plugin.i18n
 			}),
 			contentEl
 		);

@@ -40,5 +40,14 @@ export default {
                 updateFailed: "更新文件失败"
             }
         }
+    },
+    modal: {
+        confirm: "确认",
+        cancel: "取消",
+        diffViewer: {
+            title: "变更前后对比",
+            confirmHint: "确认 (Enter)",
+            cancelHint: "取消 (Esc)"
+        }
     }
 } 

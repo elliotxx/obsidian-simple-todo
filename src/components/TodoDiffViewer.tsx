@@ -1,14 +1,16 @@
 import React, { useEffect } from 'react';
 import ReactDiffViewer from 'react-diff-viewer';
 import { DiffResult } from '../types';
+import { I18n } from '../i18n';
 
 interface TodoDiffViewerProps {
   diffResult: DiffResult;
   onClose: () => void;
   onConfirm: () => void;
+  i18n: I18n;
 }
 
-export const TodoDiffViewer: React.FC<TodoDiffViewerProps> = ({ diffResult, onClose, onConfirm }) => {
+export const TodoDiffViewer: React.FC<TodoDiffViewerProps> = ({ diffResult, onClose, onConfirm, i18n }) => {
   const { oldContent, newContent } = diffResult;
   const isDarkMode = document.body.classList.contains('theme-dark');
 
@@ -29,7 +31,7 @@ export const TodoDiffViewer: React.FC<TodoDiffViewerProps> = ({ diffResult, onCl
   return (
     <div className="todo-diff-viewer">
       <div className="todo-diff-header">
-        <h3>变更前后对比</h3>
+        <h3>{i18n.t('modal.diffViewer.title')}</h3>
       </div>
       <div className="todo-diff-content">
         <ReactDiffViewer
@@ -42,8 +44,12 @@ export const TodoDiffViewer: React.FC<TodoDiffViewerProps> = ({ diffResult, onCl
         />
       </div>
       <div className="todo-diff-footer">
-        <button className="mod-cta" onClick={onConfirm}>确认 (Enter)</button>
-        <button onClick={onClose}>取消 (Esc)</button>
+        <button className="mod-cta" onClick={onConfirm}>
+          {i18n.t('modal.diffViewer.confirmHint')}
+        </button>
+        <button onClick={onClose}>
+          {i18n.t('modal.diffViewer.cancelHint')}
+        </button>
       </div>
     </div>
   );
