@@ -1,4 +1,4 @@
-# Obsidian Simple Todo
+# Simple Todo
 
 一个极简的、基于文本的 Todo 管理器（Text-Based GTD）插件，帮助你在 Obsidian 中高效管理任务。
 

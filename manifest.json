@@ -1,9 +1,9 @@
 {
 	"id": "simple-todo",
 	"name": "Simple Todo",
-	"version": "0.1.12",
+	"version": "0.2.7",
 	"minAppVersion": "0.15.0",
-	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management.",
+	"description": "A minimalist text-based todo manager (Text-Based GTD) for efficient task management.",
 	"author": "elliotxx",
 	"authorUrl": "https://github.com/elliotxx",
 	"isDesktopOnly": false

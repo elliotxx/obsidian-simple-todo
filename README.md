@@ -1,4 +1,4 @@
-# Obsidian Simple Todo
+# Simple Todo
 
 A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management in Obsidian.
 

@@ -1,7 +1,7 @@
 {
 	"name": "simple-todo",
 	"version": "1.0.0",
-	"description": "A minimalist text-based todo manager (Text-Based GTD) plugin for efficient task management.",
+	"description": "A minimalist text-based todo manager (Text-Based GTD) for efficient task management.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
