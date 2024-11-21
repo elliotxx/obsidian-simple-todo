@@ -1,11 +1,4 @@
 export default {
-    settings: {
-        language: {
-            name: "语言",
-            desc: "更改显示语言",
-            changed: "语言切换成功"
-        }
-    },
     status: {
         todo: "待办",
         inProgress: "进行中",
@@ -48,6 +41,16 @@ export default {
             title: "变更前后对比",
             confirmHint: "确认 (Enter)",
             cancelHint: "取消 (Esc)"
+        }
+    },
+    settings: {
+        archivePath: {
+            name: "归档文件夹路径",
+            desc: "已完成任务的归档文件夹路径"
+        },
+        showDiffPreview: {
+            name: "显示变更预览",
+            desc: "重新规划任务时显示变更预览对话框"
         }
     }
 } 

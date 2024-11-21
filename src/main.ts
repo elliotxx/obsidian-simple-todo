@@ -13,9 +13,13 @@ export default class SimpleTodoPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
-		this.i18n = new I18n(this.settings.language);
+		
+		// Get Obsidian's locale setting
+		// @ts-ignore - app.locale exists but is not in the type definitions
+		const locale = window.localStorage.getItem('language') || 'en';
+		this.i18n = new I18n(locale);
 
-		// Add settings panel
+		// Add settings tab
 		this.addSettingTab(new SimpleTodoSettingTab(this.app, this));
 
 		// Register plugin commands
@@ -572,7 +576,7 @@ export default class SimpleTodoPlugin extends Plugin {
 			if (completedTasks.length === 0) continue;
 
 			// Ensure archive directory exists
-			const archiveDirPath = 'simple-todo';
+			const archiveDirPath = this.settings.archivePath;
 			if (!await this.ensureArchiveDirectory(archiveDirPath)) {
 				console.error('Failed to create archive directory');
 				new Notice('Failed to create archive directory');

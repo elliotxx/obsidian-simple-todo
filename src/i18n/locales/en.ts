@@ -1,11 +1,4 @@
 export default {
-    settings: {
-        language: {
-            name: "Language",
-            desc: "Change the display language",
-            changed: "Language changed successfully"
-        }
-    },
     status: {
         todo: "Todo",
         inProgress: "In progress",
@@ -48,6 +41,16 @@ export default {
             title: "Preview changes",
             confirmHint: "Confirm (Enter)",
             cancelHint: "Cancel (Esc)"
+        }
+    },
+    settings: {
+        archivePath: {
+            name: "Archive folder path",
+            desc: "The folder path where completed tasks will be archived"
+        },
+        showDiffPreview: {
+            name: "Show changes preview",
+            desc: "Show preview dialog before applying changes when rescheduling tasks"
         }
     }
 } 

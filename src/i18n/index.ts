@@ -1,28 +1,26 @@
 import en from './locales/en';
 import zhCN from './locales/zh-CN';
-import type { LocaleType } from '../types';
-
-export const LOCALES = {
-    en,
-    'zh-CN': zhCN
-} as const;
-
-export type LocaleKey = keyof typeof LOCALES;
 
 export class I18n {
-    private locale: LocaleKey = 'en';
+    private translations: any;
 
-    constructor(locale: LocaleKey = 'en') {
-        this.setLocale(locale);
+    constructor(locale: string) {
+        const normalizedLocale = locale.toLowerCase();
+        
+        if (normalizedLocale === 'zh-cn' || 
+            normalizedLocale === 'zh' || 
+            normalizedLocale === 'zh-hans' || 
+            normalizedLocale === 'zh_cn' ||
+            normalizedLocale === 'zh_hans') {
+            this.translations = zhCN;
+        } else {
+            this.translations = en;
+        }
     }
 
-    setLocale(locale: LocaleKey) {
-        this.locale = locale;
-    }
-
-    t(key: string, params?: Record<string, string>): string {
+    t(key: string, variables?: Record<string, any>): string {
         const keys = key.split('.');
-        let value: any = LOCALES[this.locale];
+        let value: any = this.translations;
 
         for (const k of keys) {
             value = value?.[k];
@@ -31,8 +29,10 @@ export class I18n {
 
         if (typeof value !== 'string') return key;
 
-        if (params) {
-            return value.replace(/\{(\w+)\}/g, (_, key) => params[key] || `{${key}}`);
+        if (variables) {
+            return value.replace(/\{(\w+)\}/g, (_, key) => 
+                variables[key] !== undefined ? variables[key] : `{${key}}`
+            );
         }
 
         return value;
