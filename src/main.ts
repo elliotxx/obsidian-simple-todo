@@ -1,4 +1,4 @@
-import { App, Plugin, TFile, Notice, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
+import { App, Plugin, TFile, TFolder, Notice, MarkdownView, Editor, EditorPosition, Modal } from 'obsidian';
 import moment from 'moment';
 import { DiffResult } from './types';
 import { I18n } from './i18n';
@@ -625,7 +625,7 @@ export default class SimpleTodoPlugin extends Plugin {
 	private async ensureArchiveDirectory(dirPath: string): Promise<boolean> {
 		try {
 			const dir = this.app.vault.getAbstractFileByPath(dirPath);
-			if (!dir) {
+			if (!(dir instanceof TFolder)) {
 				await this.app.vault.createFolder(dirPath);
 			}
 			return true;
