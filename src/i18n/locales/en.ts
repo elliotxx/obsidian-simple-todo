@@ -8,9 +8,9 @@ export default {
     },
     status: {
         todo: "Todo",
-        inProgress: "In Progress",
+        inProgress: "In progress",
         done: "Done",
-        unknown: "Unknown Status"
+        unknown: "Unknown status"
     },
     weekday: {
         sunday: "Sun",
@@ -23,18 +23,18 @@ export default {
     },
     commands: {
         toggleTodo: {
-            name: "Toggle Todo Status",
+            name: "Toggle todo status",
             notice: "Task status changed: {from} -> {to}"
         },
         rescheduleTodos: {
-            name: "Reschedule Previous Todos",
+            name: "Reschedule previous todos",
             notice: {
                 noTasks: "No unfinished tasks found",
                 success: "Tasks have been rescheduled"
             }
         },
         archiveTodos: {
-            name: "Archive Completed Todos",
+            name: "Archive completed todos",
             notice: {
                 hasUnfinished: "{month} has unfinished tasks, skipping...",
                 updateFailed: "Failed to update file"
