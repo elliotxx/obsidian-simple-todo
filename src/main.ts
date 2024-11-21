@@ -702,48 +702,6 @@ export default class SimpleTodoPlugin extends Plugin {
 		
 		return this.i18n.t(weekdayMap[weekday] || 'weekday.sunday');
 	}
-
-	reloadCommands() {
-		// Clear and re-register commands
-		const commandIds = [
-			`${this.manifest.id}:toggle-todo-status`,
-			`${this.manifest.id}:reschedule-previous-todos`,
-			`${this.manifest.id}:archive-completed-todos`
-		];
-
-		// Remove existing commands
-		commandIds.forEach(id => {
-			// @ts-ignore
-			this.app.commands?.removeCommand(id);
-		});
-
-		// Re-register commands
-		this.addCommand({
-			id: 'toggle-todo-status',
-			name: this.i18n.t('commands.toggleTodo.name'),
-			editorCallback: (editor: Editor) => {
-				this.toggleTodoStatus();
-			}
-		});
-
-		this.addCommand({
-			id: 'reschedule-previous-todos',
-			name: this.i18n.t('commands.rescheduleTodos.name'),
-			callback: async () => {
-				const diffResult = await this.reschedulePreviousTodos();
-				if (diffResult) {
-					const modal = new TodoDiffModal(this.app, diffResult, this);
-					modal.open();
-				}
-			}
-		});
-
-		this.addCommand({
-			id: 'archive-completed-todos',
-			name: this.i18n.t('commands.archiveTodos.name'),
-			callback: () => this.archiveCompletedTodos()
-		});
-	}
 }
 
 // Create a Modal class to display diff
