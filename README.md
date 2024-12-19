@@ -144,6 +144,19 @@ npm run build
    - Commit all changes
    - Create new release tag
 
+## Todo List
+
+- [ ] Task Priority Management
+  - Support manual priority setting
+  - Support quick priority setting via hotkeys
+  - Auto-sort tasks based on priority
+- [ ] Important but Not Urgent Task Management
+  - Support moving tasks to [Important but Not Urgent] list
+  - Daily random reminder of tasks from [Important but Not Urgent] list
+- [ ] Hotkey Binding Enhancement
+  - Add default hotkeys for common operations
+  - Support custom hotkey configuration
+
 ## Contributing
 
 Issues and Pull Requests are welcome!
